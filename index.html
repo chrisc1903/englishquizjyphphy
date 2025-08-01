@@ -1619,7 +1619,7 @@ const quizSets = [
             }
 
             feedbackExplanationEl.textContent = currentQuestion.explanation;
-            feedbackJustificationEl.textContent = `Justification: ${currentQuestion.justification}`;
+            feedbackJustificationEl.innerHTML = `Justification: ${currentQuestion.justification}`;
             feedbackContainerEl.classList.remove('hidden');
 
             Array.from(optionsContainerEl.children).forEach(button => {
