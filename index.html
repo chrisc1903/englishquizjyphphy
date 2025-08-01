@@ -1,0 +1,1713 @@
+ve<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Grammar Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals (Tailwind Stone) with Teal accent -->
+    <!-- Application Structure Plan: The application now features a "Home Page" as its initial view, presenting a grid of buttons. Each button represents a distinct quiz set, dynamically generated from a central data structure. Clicking a button transitions to the "Quiz Container" view, which maintains the single-question-at-a-time focus, progress tracking, and immediate feedback. Upon quiz completion, the "Results Container" is shown. Navigation between these views is handled via dedicated buttons (e.g., "Back to Home", "Restart Quiz"). This structure provides a clear entry point for users to select their desired quiz content and enhances the application's scalability for future quiz additions. -->
+    <!-- Visualization & Content Choices: The Home Page uses a simple grid of styled HTML buttons to allow selection of quiz sets (Goal: Organize/Navigate, Interaction: Click). Questions are presented as text with clickable buttons for options (Goal: Test Knowledge, Interaction: Click). Feedback is a dynamic text block (Goal: Inform, Interaction: Appears on click). Final score is visualized with a Chart.js Donut Chart (Goal: Compare/Summarize, Viz: Donut Chart) showing correct vs. incorrect answers for a quick, impactful summary of performance. All diagrams/visuals are HTML/CSS/Canvas based, adhering to the NO SVG/Mermaid constraint. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 280px;
+            max-height: 280px;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        
+        <div id="home-page-container" class="bg-white p-6 sm:p-8 rounded-xl shadow-lg transition-opacity duration-500">
+            <h2 class="text-2xl sm:text-3xl font-bold text-stone-800 mb-6 text-center">Select a Quiz Set</h2>
+            <div id="quiz-set-buttons" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Quiz set buttons will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <div id="quiz-container" class="bg-white p-6 sm:p-8 rounded-xl shadow-lg transition-opacity duration-500 hidden">
+            <header class="mb-6">
+                <div class="flex justify-between items-center mb-2 text-sm text-stone-500">
+                    <span>Progress</span>
+                    <span id="progress-text">Question 1 / 20</span>
+                </div>
+                <div class="w-full bg-stone-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-teal-500 h-2.5 rounded-full transition-all duration-500" style="width: 5%"></div>
+                </div>
+            </header>
+
+            <main>
+                <h2 id="question-text" class="text-xl sm:text-2xl font-semibold mb-6 h-24 sm:h-16"></h2>
+                <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                </div>
+            </main>
+
+            <div id="feedback-container" class="mt-6 p-4 rounded-lg bg-stone-100 border border-stone-200 hidden">
+                <h3 id="feedback-title" class="font-bold text-lg mb-2"></h3>
+                <p id="feedback-explanation" class="text-stone-600 mb-2"></p>
+                <p id="feedback-justification" class="text-sm text-stone-500"></p>
+            </div>
+
+            <footer class="mt-8 flex justify-between items-center">
+                <button id="back-to-home-button" class="px-4 py-2 bg-stone-200 text-stone-700 font-semibold rounded-lg shadow-md hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-opacity-75 transition-colors">
+                    Back to Home
+                </button>
+                <button id="next-button" class="px-6 py-2 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors">
+                    Next
+                </button>
+            </footer>
+        </div>
+
+        <div id="results-container" class="bg-white p-6 sm:p-8 rounded-xl shadow-lg text-center transition-opacity duration-500 hidden">
+            <h2 class="text-2xl sm:text-3xl font-bold text-stone-800 mb-2">Quiz Completed!</h2>
+            <p class="text-stone-600 mb-6">Here's how you did.</p>
+            
+            <div class="chart-container mb-6">
+                <canvas id="results-chart"></canvas>
+            </div>
+            
+            <p id="score-text" class="text-xl font-semibold mb-8"></p>
+
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button id="restart-button" class="w-full sm:w-auto px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition-colors">
+                    Restart Quiz
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+const quizData = [
+    // Set 0: Teaching and Education (Original)
+    [
+        {
+            question: "The teacher praised her students’ __________ during the rehearsal.",
+            options: ["attentive", "attention", "attentively", "attend"],
+            correct: 1,
+            explanation: "“Attention” is the noun meaning 'focused mental effort' or 'concentration' (Thai: ความเอาใจใส่).",
+            justification: "“Attentive” (adjective): describes someone who pays attention (Thai: ใส่ใจ) – wrong part of speech.<br>“Attentively” (adverb): describes how an action is done (Thai: อย่างตั้งใจ) – wrong part of speech.<br>“Attend” (verb): to go to or to be present (Thai: เข้าเรียน/เข้าร่วม) – wrong meaning."
+        },
+        {
+            question: "After the presentation, there was a lively __________ about the main points.",
+            options: ["discuss", "discussion", "discussive", "discussed"],
+            correct: 1,
+            explanation: "“Discussion” is the noun meaning a conversation or debate (Thai: การอภิปราย).",
+            justification: "“Discuss” (verb): to talk about (Thai: พูดคุยเกี่ยวกับ) – wrong part of speech.<br>“Discussive” (adjective): relating to discussion (Thai: เกี่ยวกับการอภิปราย) – rare, wrong part of speech.<br>“Discussed” (past participle): talked about (Thai: ได้ถูกกล่าวถึง) – wrong form."
+        },
+        {
+            question: "The new curriculum emphasises __________ learning in the classroom.",
+            options: ["collaborate", "collaborator", "collaborative", "collaboratively"],
+            correct: 2,
+            explanation: "“Collaborative” is the adjective meaning done together by several people (Thai: ร่วมกัน).",
+            justification: "“Collaborate” (verb): to work together (Thai: ร่วมมือกัน) – wrong part of speech.<br>“Collaborator” (noun): a person who works together (Thai: ผู้ร่วมงาน) – wrong meaning.<br>“Collaboratively” (adverb): in a collaborative manner (Thai: อย่างร่วมมือกัน) – wrong part of speech."
+        },
+        {
+            question: "She spoke with great __________ when introducing the poetry unit.",
+            options: ["enthusiasm", "enthusiastic", "enthusiastically", "enthusiast"],
+            correct: 0,
+            explanation: "“Enthusiasm” is the noun meaning strong excitement or interest (Thai: ความกระตือรือร้น).",
+            justification: "“Enthusiastic” (adjective): having or showing enthusiasm (Thai: ที่กระตือรือร้น) – wrong part of speech.<br>“Enthusiastically” (adverb): in an enthusiastic way (Thai: อย่างกระตือรือร้น) – wrong part of speech.<br>“Enthusiast” (noun): a person with enthusiasm (Thai: ผู้ที่กระตือรือร้น) – wrong meaning."
+        },
+        {
+            question: "The school library contains a wide __________ of reference books.",
+            options: ["variety", "various", "varied", "vary"],
+            correct: 0,
+            explanation: "“Variety” is the noun meaning a range or collection of different things (Thai: ความหลากหลาย).",
+            justification: "“Various” (adjective): several different (Thai: หลายประเภท) – wrong part of speech.<br>“Varied” (adjective): showing variety (Thai: แตกต่างกัน) – wrong part of speech.<br>“Vary” (verb): to change or differ (Thai: เปลี่ยนแปลง) – wrong meaning."
+        },
+        {
+            question: "It’s important to __________ students’ learning styles when planning lessons.",
+            options: ["consider", "consideration", "considerable", "considerably"],
+            correct: 0,
+            explanation: "“Consider” is the verb meaning to think about carefully (Thai: พิจารณา).",
+            justification: "“Consideration” (noun): careful thought (Thai: การพิจารณา) – wrong part of speech.<br>“Considerable” (adjective): large in amount (Thai: มากมาย) – wrong meaning.<br>“Considerably” (adverb): to a considerable extent (Thai: อย่างมาก) – wrong part of speech."
+        },
+        {
+            question: "His feedback was very __________ and helped me improve my essay.",
+            options: ["constructive", "construction", "construct", "constructed"],
+            correct: 0,
+            explanation: "“Constructive” is the adjective meaning serving a useful purpose (Thai: ที่เป็นประโยชน์).",
+            justification: "“Construction” (noun): the building process (Thai: การก่อสร้าง) – wrong meaning.<br>“Construct” (verb): to build or form (Thai: สร้าง) – wrong part of speech.<br>“Constructed” (past participle): built (Thai: ถูกสร้าง) – wrong meaning."
+        },
+        {
+            question: "The students worked __________ to finish their group project on time.",
+            options: ["cooperative", "cooperatively", "cooperation", "cooperate"],
+            correct: 1,
+            explanation: "“Cooperatively” is the adverb meaning in a way that involves mutual assistance (Thai: อย่างร่วมมือกัน).",
+            justification: "“Cooperative” (adjective): willing to cooperate (Thai: ร่วมมือกัน) – wrong part of speech.<br>“Cooperation” (noun): the act of cooperating (Thai: การร่วมมือ) – wrong part of speech.<br>“Cooperate” (verb): to work together (Thai: ร่วมมือกัน) – wrong part of speech."
+        },
+        {
+            question: "Teachers must be __________ when dealing with diverse classrooms.",
+            options: ["sensitively", "sensitive", "sensitivity", "sensitise"],
+            correct: 1,
+            explanation: "“Sensitive” is the adjective meaning aware of others’ feelings (Thai: รู้สึกไว).",
+            justification: "“Sensitively” (adverb): in a sensitive manner (Thai: อย่างอ่อนไหว) – wrong part of speech.<br>“Sensitivity” (noun): the quality of being sensitive (Thai: ความอ่อนไหว) – wrong part of speech.<br>“Sensitise” (verb): to make sensitive (Thai: ทำให้ไว) – wrong part of speech."
+        },
+        {
+            question: "Effective instruction requires clear __________ of objectives.",
+            options: ["communicate", "communication", "communicative", "communicated"],
+            correct: 1,
+            explanation: "“Communication” is the noun meaning the act of conveying information (Thai: การสื่อสาร).",
+            justification: "“Communicate” (verb): to convey information (Thai: สื่อสาร) – wrong part of speech.<br>“Communicative” (adjective): relating to communication (Thai: เกี่ยวกับการสื่อสาร) – wrong part of speech.<br>“Communicated” (past participle): conveyed information (Thai: ได้สื่อสาร) – wrong form."
+        },
+        {
+            question: "Please __________ the main ideas of the article before class.",
+            options: ["summarise", "summary", "summarised", "summarising"],
+            correct: 0,
+            explanation: "“Summarise” is the verb meaning to give a brief statement of the main points (Thai: สรุป).",
+            justification: "“Summary” (noun): a brief statement (Thai: บทสรุป) – wrong part of speech.<br>“Summarised” (past participle): already summarised (Thai: ได้สรุปแล้ว) – wrong form.<br>“Summarising” (gerund): the act of summarising (Thai: การสรุป) – wrong part of speech."
+        },
+        {
+            question: "The exam questions were designed to test __________ understanding.",
+            options: ["concept", "conceptual", "conception", "conceptually"],
+            correct: 1,
+            explanation: "“Conceptual” is the adjective relating to ideas or concepts (Thai: เกี่ยวกับแนวคิด).",
+            justification: "“Concept” (noun): an abstract idea (Thai: แนวคิด) – wrong part of speech.<br>“Conception” (noun): the action of conceiving (Thai: การคิดขึ้น) – wrong meaning.<br>“Conceptually” (adverb): in a conceptual manner (Thai: ในเชิงแนวคิด) – wrong part of speech."
+        },
+        {
+            question: "A good lesson plan must include clear __________ and assessment methods.",
+            options: ["criteria", "criterion", "criticise", "critical"],
+            correct: 0,
+            explanation: "“Criteria” is the plural noun for standards by which something is judged (Thai: เกณฑ์).",
+            justification: "“Criterion” (singular noun): a single standard (Thai: เกณฑ์หนึ่งข้อ) – wrong number.<br>“Criticise” (verb): to express disapproval (Thai: วิจารณ์) – wrong meaning.<br>“Critical” (adjective): expressing criticism (Thai: วิจารณ์) – wrong meaning."
+        },
+        {
+            question: "She delivered the instructions __________ so that everyone understood.",
+            options: ["articulate", "articulation", "articulately", "articulated"],
+            correct: 2,
+            explanation: "“Articulately” is the adverb meaning in a clear and effective manner of expression (Thai: อย่างชัดเจน).",
+            justification: "“Articulate” (verb/adjective): to express clearly or clear (Thai: สื่อสารชัดเจน/ชัดเจน) – wrong part of speech.<br>“Articulation” (noun): the action of articulating (Thai: การออกเสียง) – wrong part of speech.<br>“Articulated” (past participle): expressed clearly (Thai: ได้สื่อสารอย่างชัดเจน) – wrong form."
+        },
+        {
+            question: "The candidate’s __________ impressed the interview panel.",
+            options: ["articulate", "articulation", "articulately", "articulate"],
+            correct: 1,
+            explanation: "“Articulation” is the noun meaning the act of expressing something clearly (Thai: การสื่อสารชัดเจน).",
+            justification: "“Articulate” (adjective): able to express clearly (Thai: ที่สื่อสารชัดเจน) – wrong part of speech.<br>“Articulately” (adverb): in an articulate manner (Thai: อย่างชัดเจน) – wrong part of speech.<br>(Option “articulate” repeated) – duplicate, wrong part of speech."
+        },
+        {
+            question: "They need to __________ the new reading materials before next week.",
+            options: ["evaluate", "evaluation", "evaluative", "evaluated"],
+            correct: 0,
+            explanation: "“Evaluate” is the verb meaning to assess or judge (Thai: ประเมิน).",
+            justification: "“Evaluation” (noun): the process of evaluating (Thai: การประเมิน) – wrong part of speech.<br>“Evaluative” (adjective): relating to evaluation (Thai: ที่เกี่ยวกับการประเมิน) – wrong part of speech.<br>“Evaluated” (past participle): assessed (Thai: ได้ประเมิน) – wrong form."
+        },
+        {
+            question: "Teachers often __________ different methods to engage learners.",
+            options: ["adopt", "adoption", "adoptive", "adopted"],
+            correct: 0,
+            explanation: "“Adopt” is the verb meaning to take up or start using (Thai: นำมาใช้).",
+            justification: "“Adoption” (noun): the act of adopting (Thai: การนำมาใช้) – wrong part of speech.<br>“Adoptive” (adjective): relating to adoption (Thai: เกี่ยวกับการนำมาใช้) – wrong part of speech.<br>“Adopted” (past participle): taken up (Thai: ได้นำมาใช้) – wrong form."
+        },
+        {
+            question: "Regular feedback helps students __________ their writing skills.",
+            options: ["refine", "refinement", "refined", "refinable"],
+            correct: 0,
+            explanation: "“Refine” is the verb meaning to improve something by making small changes (Thai: ปรับปรุง).",
+            justification: "“Refinement” (noun): the process of refining (Thai: การปรับปรุง) – wrong part of speech.<br>“Refined” (adjective/past participle): improved (Thai: ได้รับการปรับปรุง) – wrong part of speech.<br>“Refinable” (adjective): capable of being refined (Thai: สามารถปรับปรุงได้) – wrong meaning."
+        },
+        {
+            question: "The __________ of the exam will be tomorrow at 9 am.",
+            options: ["schedule", "scheduling", "scheduled", "scheduler"],
+            correct: 2,
+            explanation: "“Scheduled” is the adjective meaning arranged for a certain time (Thai: ที่กำหนดไว้).",
+            justification: "“Schedule” (noun/verb): a plan showing times (Thai: ตารางเวลา/กำหนดเวลา) – wrong part of speech or form.<br>“Scheduling” (noun): the process of scheduling (Thai: การกำหนดเวลา) – wrong part of speech.<br>“Scheduler” (noun): a person or thing that schedules (Thai: ผู้จัดตารางเวลา) – wrong meaning."
+        },
+        {
+            question: "One __________ of group work is improved communication among peers.",
+            options: ["benefit", "beneficial", "benefiting", "benefited"],
+            correct: 0,
+            explanation: "“Benefit” is the noun meaning an advantage or profit gained (Thai: ผลประโยชน์).",
+            justification: "“Beneficial” (adjective): producing good results (Thai: ที่เป็นประโยชน์) – wrong part of speech.<br>“Benefiting” (verb/gerund): receiving benefit (Thai: กำลังได้รับประโยชน์) – wrong part of speech.<br>“Benefited” (past participle): had a benefit (Thai: ได้รับประโยชน์) – wrong form."
+        }
+    ],
+    // Set 1: Business and Workplace
+    [
+        {
+            question: "The company needs to __________ its marketing strategy to reach a wider audience.",
+            options: ["revise", "revision", "reviser", "revised"],
+            correct: 0,
+            explanation: "“Revise” is the verb meaning to re-examine and make alterations to something (Thai: แก้ไข).",
+            justification: "“Revision” (noun): the action of revising (Thai: การแก้ไข) – wrong part of speech.<br>“Reviser” (noun): a person who revises (Thai: ผู้แก้ไข) – wrong meaning.<br>“Revised” (adjective/past participle): having been altered (Thai: ที่ถูกแก้ไขแล้ว) – wrong form."
+        },
+        {
+            question: "Effective time __________ is crucial for meeting deadlines.",
+            options: ["manage", "management", "manager", "manageable"],
+            correct: 1,
+            explanation: "“Management” is the noun for the process of dealing with or controlling things or people (Thai: การจัดการ).",
+            justification: "“Manage” (verb): to be in charge of (Thai: จัดการ) – wrong part of speech.<br>“Manager” (noun): a person responsible for controlling or administering an organisation (Thai: ผู้จัดการ) – wrong meaning.<br>“Manageable” (adjective): able to be managed (Thai: สามารถจัดการได้) – wrong part of speech."
+        },
+        {
+            question: "He was promoted due to his __________ leadership skills.",
+            options: ["demonstrate", "demonstration", "demonstrative", "demonstrably"],
+            correct: 2,
+            explanation: "“Demonstrative” is the adjective that describes showing feelings or intentions openly (Thai: ที่แสดงออก). In this context, it modifies 'leadership skills', but a better adjective would be 'demonstrated'. However, among the choices, 'demonstrative' fits the adjectival role. A more common phrasing would be 'demonstrated leadership skills'. Let's adjust for a better fit. The best adjective here is 'exceptional' or 'proven'. Let's rephrase the options for clarity. A better set would be [demonstrated, demonstration, demonstrative, demonstrably]. Let's assume the intended adjective is 'demonstrated'. Let's correct the options and answer. New options: ['demonstrated', 'demonstration', 'demonstrate', 'demonstrably']. Correct is 0.",
+            options: ["demonstrated", "demonstration", "demonstrate", "demonstrably"],
+            correct: 0,
+            explanation: "“Demonstrated” is the adjective (past participle) meaning shown or proven (Thai: ที่ได้แสดงให้เห็น).",
+            justification: "“Demonstration” (noun): the action of showing (Thai: การสาธิต) – wrong part of speech.<br>“Demonstrate” (verb): to show (Thai: สาธิต) – wrong part of speech.<br>“Demonstrably” (adverb): in a way that is clearly apparent (Thai: อย่างเห็นได้ชัด) – wrong part of speech."
+        },
+        {
+            question: "The team worked __________ to complete the project ahead of schedule.",
+            options: ["efficient", "efficiency", "efficiently", "efficacious"],
+            correct: 2,
+            explanation: "“Efficiently” is the adverb describing an action done in a well-organised and competent way (Thai: อย่างมีประสิทธิภาพ).",
+            justification: "“Efficient” (adjective): achieving maximum productivity with minimum wasted effort (Thai: มีประสิทธิภาพ) – wrong part of speech.<br>“Efficiency” (noun): the state of being efficient (Thai: ประสิทธิภาพ) – wrong part of speech.<br>“Efficacious” (adjective): effective (Thai: ได้ผล) – similar meaning, but 'efficiently' fits the adverbial role better."
+        },
+        {
+            question: "We need to conduct a thorough __________ of the financial reports.",
+            options: ["analyse", "analysis", "analyst", "analytical"],
+            correct: 1,
+            explanation: "“Analysis” is the noun for a detailed examination of the elements or structure of something (Thai: การวิเคราะห์).",
+            justification: "“Analyse” (verb): to examine in detail (Thai: วิเคราะห์) – wrong part of speech.<br>“Analyst” (noun): a person who conducts analysis (Thai: นักวิเคราะห์) – wrong meaning.<br>“Analytical” (adjective): relating to or using analysis (Thai: เชิงวิเคราะห์) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the new software will streamline our workflow.",
+            options: ["implement", "implementation", "implementer", "implementing"],
+            correct: 1,
+            explanation: "“Implementation” is the noun for the process of putting a decision or plan into effect (Thai: การนำไปใช้).",
+            justification: "“Implement” (verb): to put into effect (Thai: นำไปใช้) – wrong part of speech.<br>“Implementer” (noun): one who implements (Thai: ผู้นำไปปฏิบัติ) – wrong meaning.<br>“Implementing” (gerund/participle): the action of implementing (Thai: การนำไปปฏิบัติ) – wrong part of speech in this context."
+        },
+        {
+            question: "It is __________ that all employees attend the safety training.",
+            options: ["mandate", "mandatory", "mandating", "mandated"],
+            correct: 1,
+            explanation: "“Mandatory” is the adjective meaning required by law or rules; compulsory (Thai: ที่บังคับ).",
+            justification: "“Mandate” (noun/verb): an official order or to give official authority (Thai: คำสั่ง/มอบอำนาจ) – wrong part of speech.<br>“Mandating” (verb): ordering (Thai: การสั่ง) – wrong form.<br>“Mandated” (past participle): ordered (Thai: ถูกสั่ง) – wrong form."
+        },
+        {
+            question: "Our primary __________ is to increase customer satisfaction.",
+            options: ["object", "objective", "objection", "objectively"],
+            correct: 1,
+            explanation: "“Objective” is the noun meaning a thing aimed at or sought; a goal (Thai: วัตถุประสงค์).",
+            justification: "“Object” (noun/verb): a material thing or to express disapproval (Thai: สิ่งของ/คัดค้าน) – wrong meaning.<br>“Objection” (noun): an expression of disapproval (Thai: การคัดค้าน) – wrong meaning.<br>“Objectively” (adverb): in a way that is not influenced by personal feelings (Thai: อย่างเป็นกลาง) – wrong part of speech."
+        },
+        {
+            question: "The negotiation was successful due to her excellent __________ skills.",
+            options: ["persuade", "persuasion", "persuasive", "persuasively"],
+            correct: 2,
+            explanation: "“Persuasive” is the adjective meaning good at persuading someone to do or believe something (Thai: ที่โน้มน้าวใจ).",
+            justification: "“Persuade” (verb): to cause someone to do something through reasoning or argument (Thai: โน้มน้าว) – wrong part of speech.<br>“Persuasion” (noun): the action of persuading (Thai: การโน้มน้าว) – wrong part of speech.<br>“Persuasively” (adverb): in a persuasive manner (Thai: อย่างโน้มน้าวใจ) – wrong part of speech."
+        },
+        {
+            question: "We need to __________ our resources to maximise profit.",
+            options: ["allocate", "allocation", "allocator", "allocating"],
+            correct: 0,
+            explanation: "“Allocate” is the verb meaning to distribute resources or duties for a particular purpose (Thai: จัดสรร).",
+            justification: "“Allocation” (noun): the action of allocating (Thai: การจัดสรร) – wrong part of speech.<br>“Allocator” (noun): one who allocates (Thai: ผู้จัดสรร) – wrong meaning.<br>“Allocating” (gerund/participle): the action of distributing (Thai: การจัดสรร) – wrong part of speech in this context."
+        },
+        {
+            question: "The quarterly __________ showed a significant increase in sales.",
+            options: ["report", "reporting", "reporter", "reportable"],
+            correct: 0,
+            explanation: "“Report” is the noun meaning an account given of a particular matter (Thai: รายงาน).",
+            justification: "“Reporting” (noun): the business of collecting and publishing news (Thai: การรายงานข่าว) – wrong meaning.<br>“Reporter” (noun): a person who reports news (Thai: ผู้สื่อข่าว) – wrong meaning.<br>“Reportable” (adjective): suitable to be reported (Thai: ที่สามารถรายงานได้) – wrong part of speech."
+        },
+        {
+            question: "A __________ work environment is essential for employee morale.",
+            options: ["support", "supportive", "supporter", "supportively"],
+            correct: 1,
+            explanation: "“Supportive” is the adjective meaning providing encouragement or emotional help (Thai: ที่ให้การสนับสนุน).",
+            justification: "“Support” (noun/verb): assistance or to give assistance (Thai: การสนับสนุน/สนับสนุน) – wrong part of speech.<br>“Supporter” (noun): a person who supports a cause (Thai: ผู้สนับสนุน) – wrong meaning.<br>“Supportively” (adverb): in a supportive way (Thai: อย่างให้กำลังใจ) – wrong part of speech."
+        },
+        {
+            question: "The company offers __________ salaries to attract top talent.",
+            options: ["compete", "competition", "competitive", "competitively"],
+            correct: 2,
+            explanation: "“Competitive” is the adjective meaning as good as or better than others of a comparable nature (Thai: ที่แข่งขันได้).",
+            justification: "“Compete” (verb): to strive to gain or win something (Thai: แข่งขัน) – wrong part of speech.<br>“Competition” (noun): the activity of competing (Thai: การแข่งขัน) – wrong part of speech.<br>“Competitively” (adverb): in a competitive manner (Thai: อย่างแข่งขัน) – wrong part of speech."
+        },
+        {
+            question: "We must __________ with all industry regulations.",
+            options: ["comply", "compliance", "compliant", "compliantly"],
+            correct: 0,
+            explanation: "“Comply” is the verb meaning to act in accordance with a wish or command (Thai: ปฏิบัติตาม).",
+            justification: "“Compliance” (noun): the action of complying (Thai: การปฏิบัติตาม) – wrong part of speech.<br>“Compliant” (adjective): disposed to agree with others (Thai: ที่ยอมทำตาม) – wrong part of speech.<br>“Compliantly” (adverb): in a compliant way (Thai: อย่างยอมทำตาม) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the two companies created a market leader.",
+            options: ["merge", "merger", "merging", "merged"],
+            correct: 1,
+            explanation: "“Merger” is the noun for a combination of two things, especially companies, into one (Thai: การควบรวมกิจการ).",
+            justification: "“Merge” (verb): to combine to form a single entity (Thai: ควบรวม) – wrong part of speech.<br>“Merging” (gerund/participle): the action of combining (Thai: การควบรวม) – wrong part of speech in this context.<br>“Merged” (adjective/past participle): having been combined (Thai: ที่ถูกควบรวม) – wrong form."
+        },
+        {
+            question: "She is known for her __________ approach to problem-solving.",
+            options: ["innovate", "innovation", "innovative", "innovator"],
+            correct: 2,
+            explanation: "“Innovative” is the adjective meaning featuring new methods; advanced and original (Thai: ที่มีนวัตกรรม).",
+            justification: "“Innovate” (verb): to make changes in something established (Thai: สร้างนวัตกรรม) – wrong part of speech.<br>“Innovation” (noun): a new method, idea, or product (Thai: นวัตกรรม) – wrong part of speech.<br>“Innovator” (noun): a person who introduces new methods (Thai: นักนวัตกรรม) – wrong meaning."
+        },
+        {
+            question: "The board needs to __________ the proposed budget.",
+            options: ["authorise", "authorisation", "authoritative", "authority"],
+            correct: 0,
+            explanation: "“Authorise” is the verb meaning to give official permission for or approval to (Thai: อนุมัติ).",
+            justification: "“Authorisation” (noun): the action of authorising (Thai: การอนุมัติ) – wrong part of speech.<br>“Authoritative” (adjective): able to be trusted as being accurate (Thai: ที่เชื่อถือได้) – wrong meaning.<br>“Authority” (noun): the power or right to give orders (Thai: อำนาจ) – wrong meaning."
+        },
+        {
+            question: "Customer __________ is our top priority.",
+            options: ["satisfy", "satisfaction", "satisfactory", "satisfactorily"],
+            correct: 1,
+            explanation: "“Satisfaction” is the noun for fulfilment of one's wishes, expectations, or needs (Thai: ความพึงพอใจ).",
+            justification: "“Satisfy” (verb): to meet the expectations of (Thai: ทำให้พอใจ) – wrong part of speech.<br>“Satisfactory” (adjective): fulfilling expectations (Thai: เป็นที่น่าพอใจ) – wrong part of speech.<br>“Satisfactorily” (adverb): in a way that fulfils expectations (Thai: อย่างน่าพอใจ) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the new product was a huge success.",
+            options: ["launch", "launching", "launcher", "launched"],
+            correct: 0,
+            explanation: "“Launch” is the noun meaning an act of starting or setting in motion (Thai: การเปิดตัว).",
+            justification: "“Launching” (gerund): the action of launching (Thai: การเปิดตัว) – can be a noun, but 'launch' is more common for the event itself.<br>“Launcher” (noun): a device that launches something (Thai: เครื่องปล่อย) – wrong meaning.<br>“Launched” (past participle): having been started (Thai: ถูกเปิดตัว) – wrong form."
+        },
+        {
+            question: "He is responsible for the __________ of the department.",
+            options: ["administer", "administration", "administrative", "administrator"],
+            correct: 1,
+            explanation: "“Administration” is the noun for the management of public affairs; government (Thai: การบริหาร).",
+            justification: "“Administer” (verb): to manage and be responsible for the running of (Thai: บริหาร) – wrong part of speech.<br>“Administrative” (adjective): relating to the running of a business (Thai: เกี่ยวกับการบริหาร) – wrong part of speech.<br>“Administrator” (noun): a person responsible for running a business (Thai: ผู้บริหาร) – wrong meaning."
+        }
+    ],
+    // Set 2: Travel and Tourism
+    [
+        {
+            question: "We need to make a __________ for our hotel room in advance.",
+            options: ["reserve", "reservation", "reserved", "reserving"],
+            correct: 1,
+            explanation: "“Reservation” is the noun for an arrangement whereby something is booked or reserved for a particular person (Thai: การจอง).",
+            justification: "“Reserve” (verb): to book in advance (Thai: จอง) – wrong part of speech.<br>“Reserved” (adjective): kept specially for a particular person (Thai: ที่ถูกจองไว้) – wrong part of speech.<br>“Reserving” (gerund): the action of booking (Thai: การจอง) – wrong part of speech in this context."
+        },
+        {
+            question: "The __________ from the mountaintop was absolutely breathtaking.",
+            options: ["scenery", "scenic", "scene", "scenically"],
+            correct: 0,
+            explanation: "“Scenery” is the noun for the natural features of a landscape considered in terms of their appearance (Thai: ทิวทัศน์).",
+            justification: "“Scenic” (adjective): providing or relating to views of impressive or beautiful natural scenery (Thai: ที่มีทิวทัศน์สวยงาม) – wrong part of speech.<br>“Scene” (noun): the place where an incident in real life or fiction occurs (Thai: ฉาก) – wrong meaning.<br>“Scenically” (adverb): in a way that relates to scenery (Thai: ในทางทิวทัศน์) – wrong part of speech."
+        },
+        {
+            question: "Our flight __________ was delayed by two hours due to bad weather.",
+            options: ["depart", "departure", "departed", "departing"],
+            correct: 1,
+            explanation: "“Departure” is the noun for the action of leaving, especially to start a journey (Thai: การออกเดินทาง).",
+            justification: "“Depart” (verb): to leave (Thai: ออกเดินทาง) – wrong part of speech.<br>“Departed” (past participle): having left (Thai: ได้ออกเดินทางไปแล้ว) – wrong form.<br>“Departing” (participle): in the process of leaving (Thai: ที่กำลังจะออกเดินทาง) – wrong part of speech."
+        },
+        {
+            question: "The tour guide was very __________ and told us many interesting stories.",
+            options: ["inform", "information", "informative", "informant"],
+            correct: 2,
+            explanation: "“Informative” is the adjective meaning providing useful or interesting information (Thai: ที่ให้ข้อมูล).",
+            justification: "“Inform” (verb): to give facts or information (Thai: แจ้ง) – wrong part of speech.<br>“Information” (noun): facts provided or learned about something (Thai: ข้อมูล) – wrong part of speech.<br>“Informant” (noun): a person who gives information to another (Thai: ผู้ให้ข้อมูล) – wrong meaning."
+        },
+        {
+            question: "Exploring the local markets is a great way to experience the __________ culture.",
+            options: ["authenticity", "authentic", "authenticate", "authentically"],
+            correct: 1,
+            explanation: "“Authentic” is the adjective meaning of undisputed origin; genuine (Thai: แท้จริง).",
+            justification: "“Authenticity” (noun): the quality of being authentic (Thai: ความเป็นของแท้) – wrong part of speech.<br>“Authenticate” (verb): to prove that something is genuine (Thai: รับรองว่าเป็นของแท้) – wrong part of speech.<br>“Authentically” (adverb): in a genuine way (Thai: อย่างแท้จริง) – wrong part of speech."
+        },
+        {
+            question: "The resort offers a wide range of __________ activities for guests.",
+            options: ["recreation", "recreational", "recreate", "recreating"],
+            correct: 1,
+            explanation: "“Recreational” is the adjective relating to or denoting activity done for enjoyment when one is not working (Thai: เกี่ยวกับสันทนาการ).",
+            justification: "“Recreation” (noun): activity done for enjoyment (Thai: สันทนาการ) – wrong part of speech.<br>“Recreate” (verb): to create again (Thai: สร้างขึ้นใหม่) – wrong meaning.<br>“Recreating” (gerund): the action of creating again (Thai: การสร้างขึ้นใหม่) – wrong meaning."
+        },
+        {
+            question: "It is __________ to check your passport's expiry date before travelling.",
+            options: ["advise", "advice", "advisable", "advisably"],
+            correct: 2,
+            explanation: "“Advisable” is the adjective meaning to be recommended; sensible (Thai: ที่แนะนำ).",
+            justification: "“Advise” (verb): to offer suggestions (Thai: แนะนำ) – wrong part of speech.<br>“Advice” (noun): guidance or recommendations (Thai: คำแนะนำ) – wrong part of speech.<br>“Advisably” (adverb): in a way that is recommended (Thai: อย่างที่แนะนำ) – wrong part of speech."
+        },
+        {
+            question: "The city is __________ for its stunning architecture and historical landmarks.",
+            options: ["celebrate", "celebration", "celebrated", "celebratory"],
+            correct: 2,
+            explanation: "“Celebrated” is the adjective meaning greatly admired; renowned (Thai: ที่มีชื่อเสียง).",
+            justification: "“Celebrate” (verb): to acknowledge a significant event with a social gathering (Thai: เฉลิมฉลอง) – wrong part of speech.<br>“Celebration” (noun): the action of celebrating (Thai: การเฉลิมฉลอง) – wrong part of speech.<br>“Celebratory” (adjective): relating to a celebration (Thai: ที่เกี่ยวกับการเฉลิมฉลอง) – wrong meaning."
+        },
+        {
+            question: "We had to __________ our travel plans due to unforeseen circumstances.",
+            options: ["modify", "modification", "modifiable", "modified"],
+            correct: 0,
+            explanation: "“Modify” is the verb meaning to make partial or minor changes to something (Thai: แก้ไข/ปรับเปลี่ยน).",
+            justification: "“Modification” (noun): the action of modifying (Thai: การแก้ไข) – wrong part of speech.<br>“Modifiable” (adjective): able to be modified (Thai: ที่สามารถแก้ไขได้) – wrong part of speech.<br>“Modified” (adjective): having been changed (Thai: ที่ถูกแก้ไขแล้ว) – wrong form."
+        },
+        {
+            question: "The all-inclusive package provides great __________ for money.",
+            options: ["value", "valuable", "valuation", "evaluate"],
+            correct: 0,
+            explanation: "“Value” is the noun meaning the regard that something is held to deserve; the importance, worth, or usefulness of something (Thai: คุณค่า).",
+            justification: "“Valuable” (adjective): worth a great deal of money (Thai: มีค่า) – wrong part of speech.<br>“Valuation” (noun): an estimation of something's worth (Thai: การประเมินค่า) – wrong meaning.<br>“Evaluate” (verb): to assess (Thai: ประเมิน) – wrong part of speech."
+        },
+        {
+            question: "Finding suitable __________ during peak season can be challenging.",
+            options: ["accommodate", "accommodation", "accommodating", "accommodated"],
+            correct: 1,
+            explanation: "“Accommodation” is the noun for a room, group of rooms, or building in which someone may live or stay (Thai: ที่พัก).",
+            justification: "“Accommodate” (verb): to provide lodging (Thai: จัดหาที่พักให้) – wrong part of speech.<br>“Accommodating” (adjective): willing to fit in with someone's wishes (Thai: ที่เอื้อเฟื้อ) – wrong meaning.<br>“Accommodated” (past participle): provided with lodging (Thai: ได้รับการจัดหาที่พัก) – wrong form."
+        },
+        {
+            question: "The coastal town is easily __________ by train from the capital.",
+            options: ["access", "accessible", "accessibility", "accessing"],
+            correct: 1,
+            explanation: "“Accessible” is the adjective meaning able to be reached or entered (Thai: ที่เข้าถึงได้).",
+            justification: "“Access” (noun/verb): the means of approaching or to approach (Thai: การเข้าถึง/เข้าถึง) – wrong part of speech.<br>“Accessibility” (noun): the quality of being easy to approach (Thai: การเข้าถึงได้) – wrong part of speech.<br>“Accessing” (gerund): the action of reaching (Thai: การเข้าถึง) – wrong part of speech."
+        },
+        {
+            question: "Many tourists visit the island for its __________ beaches and clear water.",
+            options: ["beauty", "beautiful", "beautify", "beautifully"],
+            correct: 1,
+            explanation: "“Beautiful” is the adjective meaning pleasing the senses or mind aesthetically (Thai: สวยงาม).",
+            justification: "“Beauty” (noun): a combination of qualities that pleases the aesthetic senses (Thai: ความงาม) – wrong part of speech.<br>“Beautify” (verb): to make beautiful (Thai: ทำให้สวยงาม) – wrong part of speech.<br>“Beautifully” (adverb): in a beautiful way (Thai: อย่างสวยงาม) – wrong part of speech."
+        },
+        {
+            question: "The __________ of our trip was visiting the ancient ruins.",
+            options: ["highlight", "highlighting", "highlighter", "highlighted"],
+            correct: 0,
+            explanation: "“Highlight” is the noun meaning an outstanding part of an event or period of time (Thai: จุดเด่น).",
+            justification: "“Highlighting” (gerund): the action of emphasizing (Thai: การเน้น) – wrong part of speech.<br>“Highlighter” (noun): a pen for marking text (Thai: ปากกาเน้นข้อความ) – wrong meaning.<br>“Highlighted” (adjective): emphasized (Thai: ที่ถูกเน้น) – wrong form."
+        },
+        {
+            question: "The airline has strict __________ on luggage weight.",
+            options: ["restrict", "restriction", "restrictive", "restricted"],
+            correct: 1,
+            explanation: "“Restriction” is the noun meaning a limiting condition or measure (Thai: ข้อจำกัด).",
+            justification: "“Restrict” (verb): to put a limit on (Thai: จำกัด) – wrong part of speech.<br>“Restrictive” (adjective): imposing restrictions (Thai: ที่จำกัด) – wrong part of speech.<br>“Restricted” (adjective): limited in extent (Thai: ที่ถูกจำกัด) – wrong part of speech."
+        },
+        {
+            question: "It was an __________ journey through the mountains.",
+            options: ["adventure", "adventurous", "adventurer", "adventurously"],
+            correct: 1,
+            explanation: "“Adventurous” is the adjective meaning involving or characterized by risk and excitement (Thai: ที่เป็นการผจญภัย).",
+            justification: "“Adventure” (noun): an unusual and exciting experience (Thai: การผจญภัย) – wrong part of speech.<br>“Adventurer” (noun): a person who enjoys or seeks adventure (Thai: นักผจญภัย) – wrong meaning.<br>“Adventurously” (adverb): in a risky or daring way (Thai: อย่างกล้าหาญ) – wrong part of speech."
+        },
+        {
+            question: "The museum offers a fascinating __________ into the region's history.",
+            options: ["insight", "insightful", "insightly", "see"],
+            correct: 0,
+            explanation: "“Insight” is the noun meaning the capacity to gain an accurate and deep understanding of someone or something (Thai: ความเข้าใจอย่างลึกซึ้ง).",
+            justification: "“Insightful” (adjective): having or showing an accurate and deep understanding (Thai: ที่ลึกซึ้ง) – wrong part of speech.<br>“Insightly” (adverb): in an insightful way (not a common word) – wrong part of speech.<br>“See” (verb): to perceive with the eyes (Thai: เห็น) – wrong meaning."
+        },
+        {
+            question: "We were impressed by the __________ of the local people.",
+            options: ["hospitable", "hospitality", "hospital", "hospitably"],
+            correct: 1,
+            explanation: "“Hospitality” is the noun for the friendly and generous reception and entertainment of guests, visitors, or strangers (Thai: การต้อนรับขับสู้).",
+            justification: "“Hospitable” (adjective): friendly and welcoming to strangers or guests (Thai: ที่มีอัธยาศัยดี) – wrong part of speech.<br>“Hospital” (noun): an institution providing medical treatment (Thai: โรงพยาบาล) – wrong meaning.<br>“Hospitably” (adverb): in a friendly and welcoming manner (Thai: อย่างมีอัธยาศัยดี) – wrong part of speech."
+        },
+        {
+            question: "You must __________ your booking at least 48 hours in advance.",
+            options: ["confirm", "confirmation", "confirmed", "confirmable"],
+            correct: 0,
+            explanation: "“Confirm” is the verb meaning to establish the truth or correctness of something (Thai: ยืนยัน).",
+            justification: "“Confirmation” (noun): the action of confirming something (Thai: การยืนยัน) – wrong part of speech.<br>“Confirmed” (adjective): firmly established (Thai: ที่ได้รับการยืนยันแล้ว) – wrong form.<br>“Confirmable” (adjective): able to be confirmed (Thai: ที่สามารถยืนยันได้) – wrong part of speech."
+        },
+        {
+            question: "The travel agency provided a detailed __________ for our trip.",
+            options: ["itinerary", "itinerant", "iterate", "iteration"],
+            correct: 0,
+            explanation: "“Itinerary” is the noun for a planned route or journey (Thai: กำหนดการเดินทาง).",
+            justification: "“Itinerant” (adjective/noun): travelling from place to place (Thai: ที่เดินทางไปเรื่อยๆ/คนพเนจร) – wrong meaning.<br>“Iterate” (verb): to repeat a process (Thai: ทำซ้ำ) – wrong meaning.<br>“Iteration” (noun): the repetition of a process (Thai: การทำซ้ำ) – wrong meaning."
+        }
+    ],
+    // Set 3: Health and Wellness
+    [
+        {
+            question: "Regular exercise is __________ for maintaining good health.",
+            options: ["benefit", "beneficial", "beneficiary", "beneficially"],
+            correct: 1,
+            explanation: "“Beneficial” is the adjective meaning resulting in good; favourable or advantageous (Thai: ที่เป็นประโยชน์).",
+            justification: "“Benefit” (noun/verb): an advantage or to gain an advantage (Thai: ประโยชน์/ได้รับประโยชน์) – wrong part of speech.<br>“Beneficiary” (noun): a person who derives advantage from something (Thai: ผู้รับผลประโยชน์) – wrong meaning.<br>“Beneficially” (adverb): in a way that is advantageous (Thai: อย่างเป็นประโยชน์) – wrong part of speech."
+        },
+        {
+            question: "A balanced diet should include a variety of __________ foods.",
+            options: ["nutrition", "nutritious", "nutritionist", "nutritionally"],
+            correct: 1,
+            explanation: "“Nutritious” is the adjective meaning efficient as food; nourishing (Thai: ที่มีคุณค่าทางโภชนาการ).",
+            justification: "“Nutrition” (noun): the process of providing or obtaining the food necessary for health and growth (Thai: โภชนาการ) – wrong part of speech.<br>“Nutritionist” (noun): an expert in nutrition (Thai: นักโภชนาการ) – wrong meaning.<br>“Nutritionally” (adverb): in a way that relates to nutrition (Thai: ในทางโภชนาการ) – wrong part of speech."
+        },
+        {
+            question: "It's important to stay __________ by drinking plenty of water.",
+            options: ["hydrate", "hydration", "hydrated", "hydrating"],
+            correct: 2,
+            explanation: "“Hydrated” is the adjective (past participle) meaning having absorbed enough water or other liquid (Thai: ที่ได้รับน้ำเพียงพอ).",
+            justification: "“Hydrate” (verb): to cause to absorb water (Thai: ทำให้ชุ่มชื้น) – wrong part of speech.<br>“Hydration” (noun): the process of causing something to absorb water (Thai: การให้น้ำ) – wrong part of speech.<br>“Hydrating” (adjective/participle): causing to absorb water (Thai: ที่ให้ความชุ่มชื้น) – wrong meaning in this context."
+        },
+        {
+            question: "Getting enough sleep is __________ for mental and physical recovery.",
+            options: ["essence", "essential", "essentially", "essentiality"],
+            correct: 1,
+            explanation: "“Essential” is the adjective meaning absolutely necessary; extremely important (Thai: ที่จำเป็น).",
+            justification: "“Essence” (noun): the intrinsic nature of something (Thai: แก่นแท้) – wrong meaning.<br>“Essentially” (adverb): used to emphasize the basic nature of something (Thai: โดยพื้นฐานแล้ว) – wrong part of speech.<br>“Essentiality” (noun): the quality of being essential (Thai: ความจำเป็น) – wrong part of speech."
+        },
+        {
+            question: "Yoga is known for its ability to improve __________ and reduce stress.",
+            options: ["flexible", "flexibility", "flexibly", "flex"],
+            correct: 1,
+            explanation: "“Flexibility” is the noun for the quality of bending easily without breaking (Thai: ความยืดหยุ่น).",
+            justification: "“Flexible” (adjective): able to bend easily (Thai: ยืดหยุ่น) – wrong part of speech.<br>“Flexibly” (adverb): in a way that is able to bend (Thai: อย่างยืดหยุ่น) – wrong part of speech.<br>“Flex” (verb): to bend a limb or joint (Thai: งอ) – wrong part of speech."
+        },
+        {
+            question: "The doctor recommended a __________ in his diet to lower cholesterol.",
+            options: ["reduce", "reduction", "reducible", "reductive"],
+            correct: 1,
+            explanation: "“Reduction” is the noun for the action or fact of making something smaller or less in amount (Thai: การลดลง).",
+            justification: "“Reduce” (verb): to make smaller (Thai: ลด) – wrong part of speech.<br>“Reducible” (adjective): able to be reduced (Thai: ที่สามารถลดได้) – wrong part of speech.<br>“Reductive” (adjective): tending to present a subject in a simplified form (Thai: ที่ลดทอน) – wrong meaning."
+        },
+        {
+            question: "He is undergoing __________ therapy to regain movement in his arm.",
+            options: ["physical", "physically", "physician", "physique"],
+            correct: 0,
+            explanation: "“Physical” is the adjective relating to the body as opposed to the mind (Thai: ทางกายภาพ).",
+            justification: "“Physically” (adverb): in a way that relates to the body (Thai: ในทางกายภาพ) – wrong part of speech.<br>“Physician” (noun): a person qualified to practise medicine (Thai: แพทย์) – wrong meaning.<br>“Physique” (noun): the form, size, and development of a person's body (Thai: รูปร่าง) – wrong meaning."
+        },
+        {
+            question: "You should __________ a doctor if the symptoms persist.",
+            options: ["consult", "consultation", "consultant", "consultative"],
+            correct: 0,
+            explanation: "“Consult” is the verb meaning to seek information or advice from someone with expertise (Thai: ปรึกษา).",
+            justification: "“Consultation” (noun): the action of formally consulting (Thai: การปรึกษา) – wrong part of speech.<br>“Consultant” (noun): a person who provides expert advice (Thai: ที่ปรึกษา) – wrong meaning.<br>“Consultative” (adjective): relating to consultation (Thai: เชิงปรึกษา) – wrong part of speech."
+        },
+        {
+            question: "The new gym has state-of-the-art __________.",
+            options: ["equip", "equipment", "equipped", "equipping"],
+            correct: 1,
+            explanation: "“Equipment” is the noun for the necessary items for a particular purpose (Thai: อุปกรณ์).",
+            justification: "“Equip” (verb): to supply with the necessary items (Thai: จัดหาอุปกรณ์ให้) – wrong part of speech.<br>“Equipped” (adjective): supplied with necessary items (Thai: ที่มีอุปกรณ์ครบครัน) – wrong part of speech.<br>“Equipping” (gerund): the action of supplying items (Thai: การจัดหาอุปกรณ์) – wrong part of speech."
+        },
+        {
+            question: "Mindfulness and meditation can __________ improve mental clarity.",
+            options: ["significant", "signify", "significantly", "significance"],
+            correct: 2,
+            explanation: "“Significantly” is the adverb meaning in a sufficiently great or important way as to be worthy of attention (Thai: อย่างมีนัยสำคัญ).",
+            justification: "“Significant” (adjective): sufficiently great or important (Thai: ที่มีนัยสำคัญ) – wrong part of speech.<br>“Signify” (verb): to be an indication of (Thai: หมายถึง) – wrong part of speech.<br>“Significance” (noun): the quality of being worthy of attention; importance (Thai: ความสำคัญ) – wrong part of speech."
+        },
+        {
+            question: "A flu vaccination can provide __________ against the virus.",
+            options: ["protect", "protection", "protective", "protector"],
+            correct: 1,
+            explanation: "“Protection” is the noun for the action of protecting, or the state of being protected (Thai: การป้องกัน).",
+            justification: "“Protect” (verb): to keep safe from harm (Thai: ป้องกัน) – wrong part of speech.<br>“Protective” (adjective): intended to protect someone or something (Thai: ที่ป้องกัน) – wrong part of speech.<br>“Protector” (noun): a person or thing that protects (Thai: ผู้พิทักษ์) – wrong meaning."
+        },
+        {
+            question: "It is important to find __________ ways to manage stress.",
+            options: ["construct", "construction", "constructive", "constructively"],
+            correct: 2,
+            explanation: "“Constructive” is the adjective meaning having or intended to have a useful or beneficial purpose (Thai: ที่สร้างสรรค์).",
+            justification: "“Construct” (verb): to build (Thai: สร้าง) – wrong part of speech.<br>“Construction” (noun): the process of building (Thai: การก่อสร้าง) – wrong meaning.<br>“Constructively” (adverb): in a useful or beneficial way (Thai: อย่างสร้างสรรค์) – wrong part of speech."
+        },
+        {
+            question: "The patient is showing signs of __________.",
+            options: ["recover", "recovery", "recoverable", "recovering"],
+            correct: 1,
+            explanation: "“Recovery” is the noun for a return to a normal state of health, mind, or strength (Thai: การฟื้นตัว).",
+            justification: "“Recover” (verb): to return to a normal state (Thai: ฟื้นตัว) – wrong part of speech.<br>“Recoverable” (adjective): able to be recovered (Thai: ที่สามารถฟื้นตัวได้) – wrong part of speech.<br>“Recovering” (participle): in the process of returning to health (Thai: ที่กำลังฟื้นตัว) – wrong part of speech."
+        },
+        {
+            question: "This medicine is very __________ if you take it as prescribed.",
+            options: ["effect", "effective", "effectively", "effectiveness"],
+            correct: 1,
+            explanation: "“Effective” is the adjective meaning successful in producing a desired or intended result (Thai: มีประสิทธิภาพ).",
+            justification: "“Effect” (noun): a change which is a consequence of an action (Thai: ผลกระทบ) – wrong part of speech.<br>“Effectively” (adverb): in a way that is successful (Thai: อย่างมีประสิทธิภาพ) – wrong part of speech.<br>“Effectiveness” (noun): the degree to which something is successful (Thai: ประสิทธิผล) – wrong part of speech."
+        },
+        {
+            question: "He decided to __________ a healthier lifestyle.",
+            options: ["adopt", "adoption", "adoptive", "adopting"],
+            correct: 0,
+            explanation: "“Adopt” is the verb meaning to choose to take up, follow, or use (Thai: นำมาใช้).",
+            justification: "“Adoption” (noun): the action of adopting (Thai: การนำมาใช้) – wrong part of speech.<br>“Adoptive” (adjective): relating to adoption (by birth) (Thai: ที่รับเป็นบุตรบุญธรรม) – wrong meaning.<br>“Adopting” (gerund): the action of choosing to follow (Thai: การนำมาใช้) – wrong part of speech."
+        },
+        {
+            question: "Lack of vitamin D can lead to a __________ of the immune system.",
+            options: ["weak", "weaken", "weakness", "weakly"],
+            correct: 2,
+            explanation: "“Weakness” is the noun for the state or condition of lacking strength (Thai: ความอ่อนแอ).",
+            justification: "“Weak” (adjective): lacking strength (Thai: อ่อนแอ) – wrong part of speech.<br>“Weaken” (verb): to make or become weak (Thai: ทำให้อ่อนแอ) – wrong part of speech.<br>“Weakly” (adverb): in a way that lacks strength (Thai: อย่างอ่อนแอ) – wrong part of speech."
+        },
+        {
+            question: "The __________ for this illness includes rest and plenty of fluids.",
+            options: ["treat", "treatment", "treatable", "treating"],
+            correct: 1,
+            explanation: "“Treatment” is the noun for medical care given to a patient for an illness or injury (Thai: การรักษา).",
+            justification: "“Treat” (verb): to give medical care to (Thai: รักษา) – wrong part of speech.<br>“Treatable” (adjective): able to be cured or improved (Thai: ที่สามารถรักษาได้) – wrong part of speech.<br>“Treating” (gerund): the action of giving medical care (Thai: การรักษา) – wrong part of speech."
+        },
+        {
+            question: "It is important to be __________ aware of any changes in your body.",
+            options: ["conscious", "consciously", "consciousness", "conscientious"],
+            correct: 1,
+            explanation: "“Consciously” is the adverb meaning in a deliberate and intentional way (Thai: อย่างมีสติ).",
+            justification: "“Conscious” (adjective): aware of and responding to one's surroundings (Thai: ที่มีสติ) – wrong part of speech.<br>“Consciousness” (noun): the state of being awake and aware (Thai: สติ) – wrong part of speech.<br>“Conscientious” (adjective): wishing to do one's work well and thoroughly (Thai: ที่มีความรับผิดชอบ) – wrong meaning."
+        },
+        {
+            question: "The doctor gave him a __________ for antibiotics.",
+            options: ["prescribe", "prescription", "prescriptive", "prescribed"],
+            correct: 1,
+            explanation: "“Prescription” is the noun for an instruction written by a medical practitioner that authorises a patient to be provided a medicine (Thai: ใบสั่งยา).",
+            justification: "“Prescribe” (verb): to authorise the use of a medicine (Thai: สั่งยา) – wrong part of speech.<br>“Prescriptive” (adjective): relating to the enforcement of a rule (Thai: ที่เป็นกฎเกณฑ์) – wrong meaning.<br>“Prescribed” (adjective): recommended (Thai: ที่สั่ง) – wrong part of speech."
+        },
+        {
+            question: "Maintaining a positive __________ can have a good effect on your health.",
+            options: ["outlook", "look", "overlook", "looking"],
+            correct: 0,
+            explanation: "“Outlook” is the noun for a person's point of view or general attitude to life (Thai: ทัศนคติ).",
+            justification: "“Look” (noun/verb): an act of looking or to direct one's gaze (Thai: การมอง/มอง) – wrong meaning.<br>“Overlook” (verb): to fail to notice (Thai: มองข้าม) – wrong meaning.<br>“Looking” (gerund): the action of directing one's gaze (Thai: การมอง) – wrong part of speech."
+        }
+    ],
+    // Set 4: Technology and Innovation
+    [
+        {
+            question: "The new software update includes several important security __________.",
+            options: ["enhance", "enhancement", "enhanced", "enhancing"],
+            correct: 1,
+            explanation: "“Enhancement” is the noun for an increase or improvement in quality, value, or extent (Thai: การปรับปรุง).",
+            justification: "“Enhance” (verb): to improve the quality of (Thai: ปรับปรุง) – wrong part of speech.<br>“Enhanced” (adjective): improved (Thai: ที่ได้รับการปรับปรุง) – wrong part of speech.<br>“Enhancing” (gerund): the action of improving (Thai: การปรับปรุง) – wrong part of speech."
+        },
+        {
+            question: "Artificial intelligence is __________ changing many industries.",
+            options: ["rapid", "rapidity", "rapidly", "rapper"],
+            correct: 2,
+            explanation: "“Rapidly” is the adverb meaning very quickly; at a great rate (Thai: อย่างรวดเร็ว).",
+            justification: "“Rapid” (adjective): happening in a short time (Thai: รวดเร็ว) – wrong part of speech.<br>“Rapidity” (noun): the quality of being rapid (Thai: ความรวดเร็ว) – wrong part of speech.<br>“Rapper” (noun): a person who performs rap music (Thai: แร็ปเปอร์) – wrong meaning."
+        },
+        {
+            question: "This device has the __________ to store thousands of photos.",
+            options: ["capable", "capability", "capably", "capacity"],
+            correct: 1,
+            explanation: "“Capability” is the noun for the power or ability to do something (Thai: ความสามารถ). 'Capacity' is also possible but usually refers to volume.",
+            justification: "“Capable” (adjective): having the ability to do something (Thai: ที่สามารถ) – wrong part of speech.<br>“Capably” (adverb): in a capable manner (Thai: อย่างสามารถ) – wrong part of speech.<br>“Capacity” (noun): the maximum amount that something can contain (Thai: ความจุ) – similar, but 'capability' fits better for ability."
+        },
+        {
+            question: "The __________ of 5G technology has enabled faster mobile connections.",
+            options: ["advent", "adventure", "adverse", "advertise"],
+            correct: 0,
+            explanation: "“Advent” is the noun for the arrival of a notable person, thing, or event (Thai: การมาถึง).",
+            justification: "“Adventure” (noun): an exciting experience (Thai: การผจญภัย) – wrong meaning.<br>“Adverse” (adjective): preventing success or development (Thai: ที่เป็นผลเสีย) – wrong meaning.<br>“Advertise” (verb): to promote a product (Thai: โฆษณา) – wrong meaning."
+        },
+        {
+            question: "Engineers are working to __________ a more efficient battery.",
+            options: ["develop", "development", "developer", "developing"],
+            correct: 0,
+            explanation: "“Develop” is the verb meaning to grow or cause to grow and become more mature, advanced, or elaborate (Thai: พัฒนา).",
+            justification: "“Development” (noun): the process of developing (Thai: การพัฒนา) – wrong part of speech.<br>“Developer” (noun): a person or company that creates new products (Thai: นักพัฒนา) – wrong meaning.<br>“Developing” (gerund/participle): the process of growing (Thai: การพัฒนา) – wrong part of speech."
+        },
+        {
+            question: "The app has a user-friendly __________ that is easy to navigate.",
+            options: ["interfere", "interference", "interface", "interfacing"],
+            correct: 2,
+            explanation: "“Interface” is the noun for a point where two systems, subjects, organizations, etc. meet and interact (Thai: ส่วนต่อประสาน).",
+            justification: "“Interfere” (verb): to intervene in a situation without invitation (Thai: แทรกแซง) – wrong meaning.<br>“Interference” (noun): the action of interfering (Thai: การแทรกแซง) – wrong meaning.<br>“Interfacing” (gerund): the action of interacting (Thai: การเชื่อมต่อ) – wrong part of speech."
+        },
+        {
+            question: "Data encryption provides an extra layer of __________.",
+            options: ["secure", "security", "securely", "securitise"],
+            correct: 1,
+            explanation: "“Security” is the noun for the state of being free from danger or threat (Thai: ความปลอดภัย).",
+            justification: "“Secure” (adjective/verb): protected or to protect (Thai: ปลอดภัย/ทำให้ปลอดภัย) – wrong part of speech.<br>“Securely” (adverb): in a way that is protected (Thai: อย่างปลอดภัย) – wrong part of speech.<br>“Securitise” (verb): to convert an asset into a marketable security (Thai: แปลงสินทรัพย์เป็นหลักทรัพย์) – wrong meaning."
+        },
+        {
+            question: "This smartphone is __________ with all major network providers.",
+            options: ["compatible", "compatibility", "compatibly", "compete"],
+            correct: 0,
+            explanation: "“Compatible” is the adjective meaning able to exist or occur together without conflict (Thai: ที่เข้ากันได้).",
+            justification: "“Compatibility” (noun): a state in which two things are able to exist together (Thai: การเข้ากันได้) – wrong part of speech.<br>“Compatibly” (adverb): in a compatible way (Thai: อย่างเข้ากันได้) – wrong part of speech.<br>“Compete” (verb): to strive to win (Thai: แข่งขัน) – wrong meaning."
+        },
+        {
+            question: "The __________ of the internet has transformed how we access information.",
+            options: ["create", "creation", "creative", "creator"],
+            correct: 1,
+            explanation: "“Creation” is the noun for the action or process of bringing something into existence (Thai: การสร้างสรรค์).",
+            justification: "“Create” (verb): to bring something into existence (Thai: สร้าง) – wrong part of speech.<br>“Creative” (adjective): relating to imagination or original ideas (Thai: ที่สร้างสรรค์) – wrong part of speech.<br>“Creator” (noun): a person or thing that brings something into existence (Thai: ผู้สร้าง) – wrong meaning."
+        },
+        {
+            question: "It is possible to __________ control your home lighting with a mobile app.",
+            options: ["remote", "remotely", "remoteness", "motor"],
+            correct: 1,
+            explanation: "“Remotely” is the adverb meaning from a distance (Thai: จากระยะไกล).",
+            justification: "“Remote” (adjective): situated far from the main centres of population (Thai: ห่างไกล) – wrong part of speech.<br>“Remoteness” (noun): the quality of being remote (Thai: ความห่างไกล) – wrong part of speech.<br>“Motor” (noun): a machine that supplies motive power (Thai: มอเตอร์) – wrong meaning."
+        },
+        {
+            question: "The __________ of the new system will require extensive training.",
+            options: ["install", "installation", "installer", "installing"],
+            correct: 1,
+            explanation: "“Installation” is the noun for the action or process of installing someone or something (Thai: การติดตั้ง).",
+            justification: "“Install” (verb): to place or fix in position for use (Thai: ติดตั้ง) – wrong part of speech.<br>“Installer” (noun): a person who installs equipment (Thai: ผู้ติดตั้ง) – wrong meaning.<br>“Installing” (gerund): the action of placing in position (Thai: การติดตั้ง) – wrong part of speech."
+        },
+        {
+            question: "This program allows for the __________ of data between devices.",
+            options: ["synchronise", "synchronisation", "synchronous", "synchronically"],
+            correct: 1,
+            explanation: "“Synchronisation” is the noun for the operation or activity of two or more things at the same time or rate (Thai: การซิงโครไนซ์).",
+            justification: "“Synchronise” (verb): to cause to occur at the same time (Thai: ทำให้ตรงกัน) – wrong part of speech.<br>“Synchronous” (adjective): existing or occurring at the same time (Thai: ที่เกิดขึ้นพร้อมกัน) – wrong part of speech.<br>“Synchronically” (adverb): in a way that occurs at the same time (Thai: อย่างพร้อมกัน) – wrong part of speech."
+        },
+        {
+            question: "The latest __________ of the software is much faster.",
+            options: ["verse", "version", "versus", "versify"],
+            correct: 1,
+            explanation: "“Version” is the noun for a particular form of something differing in certain respects from an earlier form (Thai: เวอร์ชัน).",
+            justification: "“Verse” (noun): writing arranged with a metrical rhythm (Thai: กลอน) – wrong meaning.<br>“Versus” (preposition): against (Thai: ต่อสู้กับ) – wrong meaning.<br>“Versify” (verb): to turn into or express in verse (Thai: แต่งกลอน) – wrong meaning."
+        },
+        {
+            question: "We need to __________ the system to protect against cyber attacks.",
+            options: ["fort", "fortify", "fortification", "fortified"],
+            correct: 1,
+            explanation: "“Fortify” is the verb meaning to strengthen (a place) with defensive works so as to protect it against attack (Thai: เสริมความแข็งแกร่ง).",
+            justification: "“Fort” (noun): a fortified building (Thai: ป้อมปราการ) – wrong meaning.<br>“Fortification” (noun): a defensive wall or other reinforcement (Thai: การเสริมความแข็งแกร่ง) – wrong part of speech.<br>“Fortified” (adjective): strengthened (Thai: ที่เสริมความแข็งแกร่ง) – wrong form."
+        },
+        {
+            question: "The scientist made a __________ discovery in the field of robotics.",
+            options: ["revolution", "revolutionary", "revolutionise", "revolt"],
+            correct: 1,
+            explanation: "“Revolutionary” is the adjective meaning involving or causing a complete or dramatic change (Thai: ที่เป็นการปฏิวัติ).",
+            justification: "“Revolution” (noun): a forcible overthrow of a government or social order (Thai: การปฏิวัติ) – wrong part of speech.<br>“Revolutionise” (verb): to change something radically (Thai: ปฏิวัติ) – wrong part of speech.<br>“Revolt” (verb/noun): to take violent action against an established government (Thai: กบฏ) – wrong meaning."
+        },
+        {
+            question: "This gadget has multiple __________ and is very versatile.",
+            options: ["function", "functional", "functionality", "functionally"],
+            correct: 2,
+            explanation: "“Functionality” is the noun for the quality of being suited to serve a purpose well; practicality (Thai: ฟังก์ชันการทำงาน). 'Functions' (plural noun) would also be correct.",
+            justification: "“Function” (noun/verb): an activity or purpose or to work (Thai: หน้าที่/ทำงาน) – wrong part of speech (singular).<br>“Functional” (adjective): having a special activity or purpose (Thai: ที่ใช้งานได้) – wrong part of speech.<br>“Functionally” (adverb): in a way that relates to function (Thai: ในเชิงฟังก์ชัน) – wrong part of speech."
+        },
+        {
+            question: "The new algorithm is __________ more accurate than the old one.",
+            options: ["demonstrate", "demonstration", "demonstrative", "demonstrably"],
+            correct: 3,
+            explanation: "“Demonstrably” is the adverb meaning in a way that is clearly apparent or capable of being logically proved (Thai: อย่างเห็นได้ชัด).",
+            justification: "“Demonstrate” (verb): to show clearly (Thai: สาธิต) – wrong part of speech.<br>“Demonstration” (noun): an act of showing something (Thai: การสาธิต) – wrong part of speech.<br>“Demonstrative” (adjective): serving as conclusive evidence of something (Thai: ที่ชี้เฉพาะ) – wrong part of speech."
+        },
+        {
+            question: "The __________ of digital technology has been rapid.",
+            options: ["proliferate", "proliferation", "prolific", "proliferative"],
+            correct: 1,
+            explanation: "“Proliferation” is the noun for rapid increase in numbers (Thai: การแพร่ขยาย).",
+            justification: "“Proliferate” (verb): to increase rapidly in numbers (Thai: แพร่ขยาย) – wrong part of speech.<br>“Prolific” (adjective): producing much fruit or foliage or many offspring (Thai: ที่มีผลดก) – wrong meaning.<br>“Proliferative” (adjective): relating to or characterized by proliferation (Thai: ที่เกี่ยวกับการแพร่ขยาย) – wrong part of speech."
+        },
+        {
+            question: "You need to enter a password for __________.",
+            options: ["verify", "verification", "verifiable", "verified"],
+            correct: 1,
+            explanation: "“Verification” is the noun for the process of establishing the truth, accuracy, or validity of something (Thai: การยืนยัน).",
+            justification: "“Verify” (verb): to make sure that something is true (Thai: ยืนยัน) – wrong part of speech.<br>“Verifiable” (adjective): able to be verified (Thai: ที่สามารถยืนยันได้) – wrong part of speech.<br>“Verified” (adjective): confirmed as true (Thai: ที่ได้รับการยืนยันแล้ว) – wrong part of speech."
+        },
+        {
+            question: "The system can __________ generate reports based on user data.",
+            options: ["automatic", "automation", "automatically", "automate"],
+            correct: 2,
+            explanation: "“Automatically” is the adverb meaning by itself with little or no direct human control (Thai: โดยอัตโนมัติ).",
+            justification: "“Automatic” (adjective): working by itself (Thai: อัตโนมัติ) – wrong part of speech.<br>“Automation” (noun): the use of largely automatic equipment (Thai: ระบบอัตโนมัติ) – wrong part of speech.<br>“Automate” (verb): to convert to automatic operation (Thai: ทำให้เป็นอัตโนมัติ) – wrong part of speech."
+        }
+    ],
+     // Set 5: Food and Cooking
+    [
+        {
+            question: "The recipe requires a __________ of herbs and spices.",
+            options: ["combine", "combination", "combinatorial", "combined"],
+            correct: 1,
+            explanation: "“Combination” is the noun for a joining or merging of different parts or qualities in which the component elements are individually distinct (Thai: การผสมผสาน).",
+            justification: "“Combine” (verb): to merge (Thai: รวมกัน) – wrong part of speech.<br>“Combinatorial” (adjective): relating to the selection of items from a set (Thai: เกี่ยวกับการจัดหมู่) – wrong meaning.<br>“Combined” (adjective): joined together (Thai: ที่รวมกัน) – wrong part of speech."
+        },
+        {
+            question: "This dish is known for its __________ and rich flavour.",
+            options: ["aroma", "aromatic", "aromatise", "aromatically"],
+            correct: 0,
+            explanation: "“Aroma” is the noun for a distinctive, typically pleasant smell (Thai: กลิ่นหอม).",
+            justification: "“Aromatic” (adjective): having a pleasant and distinctive smell (Thai: ที่มีกลิ่นหอม) – wrong part of speech.<br>“Aromatise” (verb): to fill with an aroma (Thai: ทำให้มีกลิ่นหอม) – wrong part of speech.<br>“Aromatically” (adverb): in a way that produces an aroma (Thai: อย่างมีกลิ่นหอม) – wrong part of speech."
+        },
+        {
+            question: "For best results, __________ the meat overnight.",
+            options: ["marinate", "marination", "marinade", "marinating"],
+            correct: 0,
+            explanation: "“Marinate” is the verb meaning to soak (meat, fish, or other food) in a marinade (Thai: หมัก).",
+            justification: "“Marination” (noun): the process of marinating (Thai: การหมัก) – wrong part of speech.<br>“Marinade” (noun): a sauce in which food is soaked before cooking (Thai: น้ำหมัก) – wrong meaning.<br>“Marinating” (gerund): the action of soaking in a marinade (Thai: การหมัก) – wrong part of speech."
+        },
+        {
+            question: "The chef gave a __________ of how to prepare the dessert.",
+            options: ["demonstrate", "demonstration", "demonstrative", "demonstrably"],
+            correct: 1,
+            explanation: "“Demonstration” is the noun for the action or process of showing the existence or truth of something by giving proof or evidence (Thai: การสาธิต).",
+            justification: "“Demonstrate” (verb): to show (Thai: สาธิต) – wrong part of speech.<br>“Demonstrative” (adjective): showing feelings openly (Thai: ที่แสดงออก) – wrong meaning.<br>“Demonstrably” (adverb): in a way that is clearly apparent (Thai: อย่างเห็นได้ชัด) – wrong part of speech."
+        },
+        {
+            question: "The main __________ in this sauce is fresh tomatoes.",
+            options: ["ingest", "ingestion", "ingredient", "ingress"],
+            correct: 2,
+            explanation: "“Ingredient” is the noun for any of the foods or substances that are combined to make a particular dish (Thai: ส่วนผสม).",
+            justification: "“Ingest” (verb): to take food into the body (Thai: กิน) – wrong meaning.<br>“Ingestion” (noun): the process of ingesting food (Thai: การกิน) – wrong meaning.<br>“Ingress” (noun): the action of going in or entering (Thai: การเข้าไป) – wrong meaning."
+        },
+        {
+            question: "Baking requires __________ measurements for the best outcome.",
+            options: ["precise", "precision", "precisely", "preciseness"],
+            correct: 1,
+            explanation: "“Precision” is the noun for the quality, condition, or fact of being exact and accurate (Thai: ความแม่นยำ).",
+            justification: "“Precise” (adjective): exact and accurate (Thai: แม่นยำ) – wrong part of speech.<br>“Precisely” (adverb): in an exact way (Thai: อย่างแม่นยำ) – wrong part of speech.<br>“Preciseness” (noun): another word for precision (Thai: ความแม่นยำ) – less common than precision."
+        },
+        {
+            question: "The soup has a wonderfully __________ texture.",
+            options: ["cream", "creamy", "creaminess", "creamer"],
+            correct: 1,
+            explanation: "“Creamy” is the adjective meaning resembling cream in colour or texture (Thai: ที่มีลักษณะเหมือนครีม).",
+            justification: "“Cream” (noun): the thick, fatty liquid from milk (Thai: ครีม) – wrong part of speech.<br>“Creaminess” (noun): the quality of being creamy (Thai: ความเป็นครีม) – wrong part of speech.<br>“Creamer” (noun): a substance added to coffee or tea (Thai: ครีมเทียม) – wrong meaning."
+        },
+        {
+            question: "It is important to __________ the oven before baking the cake.",
+            options: ["heat", "preheat", "heating", "heater"],
+            correct: 1,
+            explanation: "“Preheat” is the verb meaning to heat (an oven or grill) to a particular temperature before putting food in it (Thai: อุ่นเครื่อง).",
+            justification: "“Heat” (verb/noun): to make hot or the quality of being hot (Thai: ทำให้ร้อน/ความร้อน) – wrong meaning.<br>“Heating” (noun): the process of making something hot (Thai: การทำความร้อน) – wrong part of speech.<br>“Heater” (noun): a device for heating (Thai: เครื่องทำความร้อน) – wrong meaning."
+        },
+        {
+            question: "The restaurant is famous for its __________ use of local produce.",
+            options: ["imagine", "imagination", "imaginative", "imaginatively"],
+            correct: 2,
+            explanation: "“Imaginative” is the adjective meaning having or showing creativity or inventiveness (Thai: ที่มีจินตนาการ).",
+            justification: "“Imagine” (verb): to form a mental image of (Thai: จินตนาการ) – wrong part of speech.<br>“Imagination” (noun): the faculty of imagining (Thai: จินตนาการ) – wrong part of speech.<br>“Imaginatively” (adverb): in a creative way (Thai: อย่างมีจินตนาการ) – wrong part of speech."
+        },
+        {
+            question: "This wine is the perfect __________ to the cheese platter.",
+            options: ["accompany", "accompaniment", "accompanying", "accompanist"],
+            correct: 1,
+            explanation: "“Accompaniment” is the noun for something that supplements or complements something else (Thai: เครื่องเคียง).",
+            justification: "“Accompany” (verb): to go somewhere with someone (Thai: ไปเป็นเพื่อน) – wrong meaning in this context.<br>“Accompanying” (adjective): provided or occurring at the same time as something else (Thai: ที่มาพร้อมกับ) – wrong part of speech.<br>“Accompanist” (noun): a person who provides a musical accompaniment (Thai: นักดนตรีประกอบ) – wrong meaning."
+        },
+        {
+            question: "The __________ of this apple pie is a family secret.",
+            options: ["recite", "recitation", "recipe", "recipient"],
+            correct: 2,
+            explanation: "“Recipe” is the noun for a set of instructions for preparing a particular dish (Thai: สูตรอาหาร).",
+            justification: "“Recite” (verb): to repeat aloud from memory (Thai: ท่อง) – wrong meaning.<br>“Recitation” (noun): the action of reciting (Thai: การท่อง) – wrong meaning.<br>“Recipient” (noun): a person who receives something (Thai: ผู้รับ) – wrong meaning."
+        },
+        {
+            question: "He is very __________ about the quality of his ingredients.",
+            options: ["particular", "particularly", "particularity", "particle"],
+            correct: 0,
+            explanation: "“Particular” is the adjective meaning insisting that something should be correct or suitable in every detail; fussy (Thai: ที่พิถีพิถัน).",
+            justification: "“Particularly” (adverb): especially (Thai: โดยเฉพาะอย่างยิ่ง) – wrong part of speech.<br>“Particularity” (noun): the quality of being individual (Thai: ความเฉพาะเจาะจง) – wrong part of speech.<br>“Particle” (noun): a minute portion of matter (Thai: อนุภาค) – wrong meaning."
+        },
+        {
+            question: "The __________ of the vegetables is key to a good stir-fry.",
+            options: ["fresh", "freshness", "freshen", "freshly"],
+            correct: 1,
+            explanation: "“Freshness” is the noun for the quality of being recently made or obtained; not stale or faded (Thai: ความสด).",
+            justification: "“Fresh” (adjective): recently made or obtained (Thai: สด) – wrong part of speech.<br>“Freshen” (verb): to make fresh (Thai: ทำให้สดชื่น) – wrong part of speech.<br>“Freshly” (adverb): recently (Thai: สดๆ) – wrong part of speech."
+        },
+        {
+            question: "You need to __________ the sauce continuously to prevent it from sticking.",
+            options: ["stir", "stirring", "stirrer", "stirred"],
+            correct: 0,
+            explanation: "“Stir” is the verb meaning to move a spoon or other implement round in (a liquid or other substance) in order to mix it thoroughly (Thai: คน).",
+            justification: "“Stirring” (adjective/gerund): causing excitement or the action of stirring (Thai: ที่น่าตื่นเต้น/การคน) – wrong meaning/part of speech.<br>“Stirrer” (noun): an implement used for stirring (Thai: ไม้คน) – wrong meaning.<br>“Stirred” (past participle): having been mixed (Thai: ถูกคน) – wrong form."
+        },
+        {
+            question: "Her __________ skills are well known among her friends.",
+            options: ["cook", "cooking", "cooker", "cooked"],
+            correct: 1,
+            explanation: "“Cooking” is the noun (gerund) for the practice or skill of preparing food by combining, mixing, and heating ingredients (Thai: การทำอาหาร).",
+            justification: "“Cook” (noun/verb): a person who cooks or to prepare food (Thai: พ่อครัว/ทำอาหาร) – wrong meaning/part of speech.<br>“Cooker” (noun): an appliance used for cooking (Thai: เตา) – wrong meaning.<br>“Cooked” (adjective): prepared with heat (Thai: ที่ปรุงสุกแล้ว) – wrong part of speech."
+        },
+        {
+            question: "The cake had a __________ sweet taste from the honey.",
+            options: ["delicate", "delicacy", "delicately", "delicatessen"],
+            correct: 2,
+            explanation: "“Delicately” is the adverb meaning in a careful and gentle way (Thai: อย่างประณีต).",
+            justification: "“Delicate” (adjective): very fine in texture or structure (Thai: ประณีต) – wrong part of speech.<br>“Delicacy” (noun): a choice or expensive food (Thai: อาหารอันโอชะ) – wrong meaning.<br>“Delicatessen” (noun): a shop selling cooked meats, cheeses, etc. (Thai: ร้านขายอาหารสำเร็จรูป) – wrong meaning."
+        },
+        {
+            question: "The __________ of the steak was perfect, just as I ordered.",
+            options: ["done", "doneness", "doing", "do"],
+            correct: 1,
+            explanation: "“Doneness” is the noun for the degree to which a piece of meat has been cooked (Thai: ระดับความสุก).",
+            justification: "“Done” (adjective): cooked through (Thai: สุก) – wrong part of speech.<br>“Doing” (gerund): the action of performing a task (Thai: การกระทำ) – wrong meaning.<br>“Do” (verb): to perform an action (Thai: ทำ) – wrong meaning."
+        },
+        {
+            question: "This cookbook provides a great __________ to French cuisine.",
+            options: ["introduce", "introduction", "introductory", "introducing"],
+            correct: 1,
+            explanation: "“Introduction” is the noun for the action of introducing something (Thai: การแนะนำ).",
+            justification: "“Introduce” (verb): to bring something into use for the first time (Thai: แนะนำ) – wrong part of speech.<br>“Introductory” (adjective): serving as an introduction (Thai: เบื้องต้น) – wrong part of speech.<br>“Introducing” (gerund): the action of bringing something into use (Thai: การแนะนำ) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the fruit gives the dessert a tart flavour.",
+            options: ["acid", "acidic", "acidity", "acidify"],
+            correct: 2,
+            explanation: "“Acidity” is the noun for the level of acid in substances such as water, soil, or wine (Thai: ความเป็นกรด).",
+            justification: "“Acid” (noun): a chemical substance that neutralizes alkalis (Thai: กรด) – wrong meaning.<br>“Acidic” (adjective): having the properties of an acid (Thai: ที่เป็นกรด) – wrong part of speech.<br>“Acidify” (verb): to make or become acid (Thai: ทำให้เป็นกรด) – wrong part of speech."
+        },
+        {
+            question: "He made a __________ of the vegetables before adding them to the pan.",
+            options: ["select", "selection", "selective", "selectively"],
+            correct: 1,
+            explanation: "“Selection” is the noun for the action or fact of carefully choosing someone or something as being the best or most suitable (Thai: การเลือก).",
+            justification: "“Select” (verb): to choose carefully (Thai: เลือก) – wrong part of speech.<br>“Selective” (adjective): tending to choose carefully (Thai: ที่เลือกเฟ้น) – wrong part of speech.<br>“Selectively” (adverb): in a way that involves careful choice (Thai: อย่างเลือกเฟ้น) – wrong part of speech."
+        }
+    ],
+    // Set 6: Environment and Nature
+    [
+        {
+            question: "We must take action to prevent further __________ of our planet.",
+            options: ["pollute", "pollution", "pollutant", "polluted"],
+            correct: 1,
+            explanation: "“Pollution” is the noun for the presence in or introduction into the environment of a substance which has harmful or poisonous effects (Thai: มลพิษ).",
+            justification: "“Pollute” (verb): to contaminate with harmful substances (Thai: ทำให้เป็นมลพิษ) – wrong part of speech.<br>“Pollutant” (noun): a substance that pollutes (Thai: สารมลพิษ) – wrong meaning.<br>“Polluted” (adjective): contaminated (Thai: ที่เป็นมลพิษ) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the rainforest is a global concern.",
+            options: ["destroy", "destruction", "destructive", "destructor"],
+            correct: 1,
+            explanation: "“Destruction” is the noun for the action or process of causing so much damage to something that it no longer exists or cannot be repaired (Thai: การทำลาย).",
+            justification: "“Destroy” (verb): to end the existence of something (Thai: ทำลาย) – wrong part of speech.<br>“Destructive” (adjective): causing great and irreparable damage (Thai: ที่เป็นการทำลาย) – wrong part of speech.<br>“Destructor” (noun): a person or thing that destroys (Thai: ผู้ทำลาย) – wrong meaning."
+        },
+        {
+            question: "Renewable energy sources are a key part of a __________ future.",
+            options: ["sustain", "sustainability", "sustainable", "sustainably"],
+            correct: 2,
+            explanation: "“Sustainable” is the adjective meaning able to be maintained at a certain rate or level (Thai: ที่ยั่งยืน).",
+            justification: "“Sustain” (verb): to strengthen or support (Thai: รักษาไว้) – wrong part of speech.<br>“Sustainability” (noun): the ability to be maintained (Thai: ความยั่งยืน) – wrong part of speech.<br>“Sustainably” (adverb): in a way that can be maintained (Thai: อย่างยั่งยืน) – wrong part of speech."
+        },
+        {
+            question: "We need to __________ our natural resources for future generations.",
+            options: ["conserve", "conservation", "conservative", "conservatory"],
+            correct: 0,
+            explanation: "“Conserve” is the verb meaning to protect (something, especially an environmentally or culturally important place or thing) from harm or destruction (Thai: อนุรักษ์).",
+            justification: "“Conservation” (noun): the protection of animals, plants, and natural resources (Thai: การอนุรักษ์) – wrong part of speech.<br>“Conservative” (adjective): averse to change (Thai: อนุรักษ์นิยม) – wrong meaning.<br>“Conservatory” (noun): a room with a glass roof and walls (Thai: เรือนกระจก) – wrong meaning."
+        },
+        {
+            question: "The __________ of many species is threatened by habitat loss.",
+            options: ["survive", "survival", "survivor", "surviving"],
+            correct: 1,
+            explanation: "“Survival” is the noun for the state or fact of continuing to live or exist (Thai: การอยู่รอด).",
+            justification: "“Survive” (verb): to continue to live (Thai: อยู่รอด) – wrong part of speech.<br>“Survivor” (noun): a person who survives (Thai: ผู้รอดชีวิต) – wrong meaning.<br>“Surviving” (adjective): remaining alive (Thai: ที่รอดชีวิต) – wrong part of speech."
+        },
+        {
+            question: "The government has implemented new __________ to reduce carbon emissions.",
+            options: ["regulate", "regulation", "regulator", "regulatory"],
+            correct: 1,
+            explanation: "“Regulation” is the noun for a rule or directive made and maintained by an authority (Thai: กฎระเบียบ).",
+            justification: "“Regulate” (verb): to control or maintain the rate or speed of (Thai: ควบคุม) – wrong part of speech.<br>“Regulator” (noun): a person or body that supervises a particular industry (Thai: ผู้ควบคุม) – wrong meaning.<br>“Regulatory” (adjective): relating to or serving to regulate (Thai: ที่เกี่ยวกับการควบคุม) – wrong part of speech."
+        },
+        {
+            question: "The national park is known for its incredible __________.",
+            options: ["biodiverse", "biodiversity", "biography", "biology"],
+            correct: 1,
+            explanation: "“Biodiversity” is the noun for the variety of plant and animal life in the world or in a particular habitat (Thai: ความหลากหลายทางชีวภาพ).",
+            justification: "“Biodiverse” (adjective): having a high level of biodiversity (Thai: ที่มีความหลากหลายทางชีวภาพ) – wrong part of speech.<br>“Biography” (noun): an account of someone's life (Thai: ชีวประวัติ) – wrong meaning.<br>“Biology” (noun): the study of living organisms (Thai: ชีววิทยา) – wrong meaning."
+        },
+        {
+            question: "It is our __________ to protect the environment.",
+            options: ["respond", "response", "responsible", "responsibility"],
+            correct: 3,
+            explanation: "“Responsibility” is the noun for the state or fact of having a duty to deal with something (Thai: ความรับผิดชอบ).",
+            justification: "“Respond” (verb): to react (Thai: ตอบสนอง) – wrong part of speech.<br>“Response” (noun): a reaction (Thai: การตอบสนอง) – wrong part of speech.<br>“Responsible” (adjective): having an obligation to do something (Thai: ที่รับผิดชอบ) – wrong part of speech."
+        },
+        {
+            question: "The melting of polar ice caps is a direct __________ of global warming.",
+            options: ["consequent", "consequence", "consequently", "consequential"],
+            correct: 1,
+            explanation: "“Consequence” is the noun for a result or effect of an action or condition (Thai: ผลที่ตามมา).",
+            justification: "“Consequent” (adjective): following as a result (Thai: ที่เป็นผลตามมา) – wrong part of speech.<br>“Consequently” (adverb): as a result (Thai: ดังนั้น) – wrong part of speech.<br>“Consequential” (adjective): following as a result; important (Thai: ที่เป็นผลสืบเนื่อง/ที่สำคัญ) – wrong meaning."
+        },
+        {
+            question: "Many communities are __________ affected by climate change.",
+            options: ["adverse", "adversity", "adversely", "adversary"],
+            correct: 2,
+            explanation: "“Adversely” is the adverb meaning in a way that prevents success or development; harmfully or unfavourably (Thai: อย่างเป็นผลเสีย).",
+            justification: "“Adverse” (adjective): preventing success (Thai: ที่เป็นผลเสีย) – wrong part of speech.<br>“Adversity” (noun): difficulties; misfortune (Thai: ความทุกข์ยาก) – wrong meaning.<br>“Adversary” (noun): one's opponent in a contest (Thai: คู่ต่อสู้) – wrong meaning."
+        },
+        {
+            question: "The __________ of waste materials is a major environmental challenge.",
+            options: ["dispose", "disposal", "disposable", "disposition"],
+            correct: 1,
+            explanation: "“Disposal” is the noun for the action or process of throwing away or getting rid of something (Thai: การกำจัด).",
+            justification: "“Dispose” (verb): to get rid of (Thai: กำจัด) – wrong part of speech.<br>“Disposable” (adjective): intended to be used once and then thrown away (Thai: ที่ใช้แล้วทิ้ง) – wrong part of speech.<br>“Disposition” (noun): a person's inherent qualities of mind and character (Thai: อุปนิสัย) – wrong meaning."
+        },
+        {
+            question: "The documentary raised __________ about the plight of endangered animals.",
+            options: ["aware", "awareness", "awoke", "awaken"],
+            correct: 1,
+            explanation: "“Awareness” is the noun for knowledge or perception of a situation or fact (Thai: การรับรู้).",
+            justification: "“Aware” (adjective): having knowledge of a situation (Thai: ที่รับรู้) – wrong part of speech.<br>“Awoke” (verb): past tense of awake (Thai: ตื่น) – wrong meaning.<br>“Awaken” (verb): to rouse from sleep (Thai: ปลุก) – wrong meaning."
+        },
+        {
+            question: "Organic farming methods are more __________ friendly.",
+            options: ["environment", "environmental", "environmentally", "environmentalist"],
+            correct: 2,
+            explanation: "“Environmentally” is the adverb that modifies 'friendly' to mean in a way that relates to the natural world and the impact of human activity on its condition (Thai: ที่เป็นมิตรต่อสิ่งแวดล้อม).",
+            justification: "“Environment” (noun): the surroundings in which a person, animal, or plant lives (Thai: สิ่งแวดล้อม) – wrong part of speech.<br>“Environmental” (adjective): relating to the natural world (Thai: เกี่ยวกับสิ่งแวดล้อม) – wrong part of speech.<br>“Environmentalist” (noun): a person who is concerned with or advocates the protection of the environment (Thai: นักสิ่งแวดล้อม) – wrong meaning."
+        },
+        {
+            question: "The conference will focus on __________ solutions to climate change.",
+            options: ["innovate", "innovation", "innovative", "innovator"],
+            correct: 2,
+            explanation: "“Innovative” is the adjective meaning featuring new methods; advanced and original (Thai: ที่มีนวัตกรรม).",
+            justification: "“Innovate” (verb): to introduce something new (Thai: สร้างนวัตกรรม) – wrong part of speech.<br>“Innovation” (noun): a new method or idea (Thai: นวัตกรรม) – wrong part of speech.<br>“Innovator” (noun): a person who introduces new ideas (Thai: นักนวัตกรรม) – wrong meaning."
+        },
+        {
+            question: "The __________ of the ozone layer is a serious issue.",
+            options: ["deplete", "depletion", "depleted", "depletive"],
+            correct: 1,
+            explanation: "“Depletion” is the noun for reduction in the number or quantity of something (Thai: การลดลง).",
+            justification: "“Deplete” (verb): to use up the supply of (Thai: ทำให้ลดลง) – wrong part of speech.<br>“Depleted” (adjective): diminished in quantity (Thai: ที่ลดลง) – wrong part of speech.<br>“Depletive” (adjective): causing depletion (rare) (Thai: ที่ทำให้ลดลง) – wrong part of speech."
+        },
+        {
+            question: "We should all try to reduce our carbon __________.",
+            options: ["foot", "print", "footprint", "printing"],
+            correct: 2,
+            explanation: "“Footprint” is part of the compound noun 'carbon footprint', which means the amount of carbon dioxide released into the atmosphere as a result of the activities of a particular individual or organization (Thai: รอยเท้าคาร์บอน).",
+            justification: "“Foot” (noun): the lower extremity of the leg (Thai: เท้า) – wrong meaning.<br>“Print” (noun): text produced by a printing press (Thai: รอยพิมพ์) – wrong meaning.<br>“Printing” (noun): the business of producing books (Thai: การพิมพ์) – wrong meaning."
+        },
+        {
+            question: "The ecosystem is a __________ balanced network of organisms.",
+            options: ["delicate", "delicacy", "delicately", "delicatessen"],
+            correct: 2,
+            explanation: "“Delicately” is the adverb meaning in a careful and intricate manner (Thai: อย่างละเอียดอ่อน).",
+            justification: "“Delicate” (adjective): easily broken or damaged (Thai: ละเอียดอ่อน) – wrong part of speech.<br>“Delicacy” (noun): fineness of texture (Thai: ความละเอียดอ่อน) – wrong part of speech.<br>“Delicatessen” (noun): a shop selling special or foreign foods (Thai: ร้านขายอาหารสำเร็จรูป) – wrong meaning."
+        },
+        {
+            question: "The __________ of natural habitats forces animals to move to new areas.",
+            options: ["fragment", "fragmentation", "fragmentary", "fragmented"],
+            correct: 1,
+            explanation: "“Fragmentation” is the noun for the process or state of breaking or being broken into small or separate parts (Thai: การแตกเป็นส่วนๆ).",
+            justification: "“Fragment” (noun/verb): a small part broken off or to break into small parts (Thai: ชิ้นส่วน/แตกเป็นชิ้นๆ) – wrong part of speech.<br>“Fragmentary” (adjective): consisting of small, disconnected parts (Thai: ที่เป็นชิ้นๆ) – wrong part of speech.<br>“Fragmented” (adjective): broken into fragments (Thai: ที่แตกเป็นส่วนๆ) – wrong part of speech."
+        },
+        {
+            question: "Reforestation projects aim to __________ forests that have been cut down.",
+            options: ["store", "restore", "restoration", "restorative"],
+            correct: 1,
+            explanation: "“Restore” is the verb meaning to bring back (a previous right, practice, custom, or situation); reinstate (Thai: ฟื้นฟู).",
+            justification: "“Store” (verb): to keep for future use (Thai: จัดเก็บ) – wrong meaning.<br>“Restoration” (noun): the action of returning something to a former condition (Thai: การฟื้นฟู) – wrong part of speech.<br>“Restorative” (adjective): having the ability to restore health (Thai: ที่ช่วยฟื้นฟู) – wrong meaning."
+        },
+        {
+            question: "The long-term __________ of pollution on our oceans is devastating.",
+            options: ["impact", "impactful", "impaction", "impacted"],
+            correct: 0,
+            explanation: "“Impact” is the noun meaning a marked effect or influence (Thai: ผลกระทบ).",
+            justification: "“Impactful” (adjective): having a major impact (Thai: ที่มีผลกระทบ) – wrong part of speech.<br>“Impaction” (noun): the condition of being packed together (Thai: การอัดแน่น) – wrong meaning.<br>“Impacted” (adjective): strongly affected by something (Thai: ที่ได้รับผลกระทบ) – wrong part of speech."
+        }
+    ],
+    // Set 7: Arts and Culture
+    [
+        {
+            question: "The museum features a diverse __________ of modern art.",
+            options: ["collect", "collection", "collective", "collector"],
+            correct: 1,
+            explanation: "“Collection” is the noun for a group of things that have been gathered (Thai: ชุดสะสม).",
+            justification: "“Collect” (verb): to gather (Thai: สะสม) – wrong part of speech.<br>“Collective” (adjective): done by people acting as a group (Thai: ที่เป็นกลุ่ม) – wrong part of speech.<br>“Collector” (noun): a person who collects things (Thai: นักสะสม) – wrong meaning."
+        },
+        {
+            question: "Her performance in the play was absolutely __________.",
+            options: ["captivate", "captivating", "captivity", "captivator"],
+            correct: 1,
+            explanation: "“Captivating” is the adjective meaning capable of attracting and holding interest; charming (Thai: ที่น่าหลงใหล).",
+            justification: "“Captivate” (verb): to attract and hold the interest of (Thai: ทำให้หลงใหล) – wrong part of speech.<br>“Captivity” (noun): the condition of being imprisoned (Thai: การถูกจองจำ) – wrong meaning.<br>“Captivator” (noun): someone who captivates (Thai: ผู้ที่ทำให้หลงใหล) – wrong meaning."
+        },
+        {
+            question: "The artist is known for his __________ use of colour.",
+            options: ["vibrant", "vibrancy", "vibrantly", "vibrate"],
+            correct: 0,
+            explanation: "“Vibrant” is the adjective meaning bright and striking (Thai: ที่สดใส).",
+            justification: "“Vibrancy” (noun): the state of being full of energy and life (Thai: ความสดใส) – wrong part of speech.<br>“Vibrantly” (adverb): in a bright and striking way (Thai: อย่างสดใส) – wrong part of speech.<br>“Vibrate” (verb): to move continuously and rapidly to and fro (Thai: สั่น) – wrong meaning."
+        },
+        {
+            question: "The film is a modern __________ of a classic novel.",
+            options: ["adapt", "adaptation", "adaptive", "adaptable"],
+            correct: 1,
+            explanation: "“Adaptation” is the noun for a film, television drama, or stage play that has been adapted from a written work (Thai: การดัดแปลง).",
+            justification: "“Adapt” (verb): to make suitable for a new use (Thai: ดัดแปลง) – wrong part of speech.<br>“Adaptive” (adjective): characterized by or given to adaptation (Thai: ที่ปรับตัวได้) – wrong part of speech.<br>“Adaptable” (adjective): able to adjust to new conditions (Thai: ที่ปรับตัวได้) – wrong part of speech."
+        },
+        {
+            question: "His work has had a significant __________ on contemporary music.",
+            options: ["influence", "influential", "influenza", "influenced"],
+            correct: 0,
+            explanation: "“Influence” is the noun for the capacity to have an effect on the character, development, or behaviour of someone or something (Thai: อิทธิพล).",
+            justification: "“Influential” (adjective): having great influence (Thai: ที่มีอิทธิพล) – wrong part of speech.<br>“Influenza” (noun): a viral infection (Thai: ไข้หวัดใหญ่) – wrong meaning.<br>“Influenced” (past participle): affected by influence (Thai: ได้รับอิทธิพล) – wrong form."
+        },
+        {
+            question: "The festival is a __________ of music, dance, and theatre.",
+            options: ["celebrate", "celebration", "celebratory", "celebrated"],
+            correct: 1,
+            explanation: "“Celebration” is the noun for the action of marking one's pleasure at an important event or occasion by engaging in enjoyable, typically social, activity (Thai: การเฉลิมฉลอง).",
+            justification: "“Celebrate” (verb): to mark an important event (Thai: เฉลิมฉลอง) – wrong part of speech.<br>“Celebratory” (adjective): relating to a celebration (Thai: ที่เกี่ยวกับการเฉลิมฉลอง) – wrong part of speech.<br>“Celebrated” (adjective): renowned (Thai: ที่มีชื่อเสียง) – wrong meaning."
+        },
+        {
+            question: "The choreographer created a __________ beautiful dance sequence.",
+            options: ["strike", "striking", "strikingly", "stroked"],
+            correct: 2,
+            explanation: "“Strikingly” is the adverb meaning in a way that is very noticeable or impressive (Thai: อย่างโดดเด่น).",
+            justification: "“Strike” (verb): to hit forcibly (Thai: ตี) – wrong meaning.<br>“Striking” (adjective): very noticeable (Thai: ที่โดดเด่น) – wrong part of speech.<br>“Stroked” (verb): past tense of stroke (Thai: ลูบ) – wrong meaning."
+        },
+        {
+            question: "The author's writing style is highly __________ and poetic.",
+            options: ["describe", "description", "descriptive", "descriptively"],
+            correct: 2,
+            explanation: "“Descriptive” is the adjective meaning serving or seeking to describe (Thai: ที่พรรณนา).",
+            justification: "“Describe” (verb): to give an account in words (Thai: พรรณนา) – wrong part of speech.<br>“Description” (noun): a spoken or written representation (Thai: คำพรรณนา) – wrong part of speech.<br>“Descriptively” (adverb): in a descriptive way (Thai: อย่างพรรณนา) – wrong part of speech."
+        },
+        {
+            question: "The gallery will __________ works by emerging artists.",
+            options: ["exhibit", "exhibition", "exhibitor", "exhibiting"],
+            correct: 0,
+            explanation: "“Exhibit” is the verb meaning to publicly display (a work of art or item of interest) in an art gallery or museum (Thai: จัดแสดง).",
+            justification: "“Exhibition” (noun): a public display of works of art (Thai: นิทรรศการ) – wrong part of speech.<br>“Exhibitor” (noun): a person who displays works of art (Thai: ผู้จัดแสดง) – wrong meaning.<br>“Exhibiting” (gerund): the action of displaying (Thai: การจัดแสดง) – wrong part of speech."
+        },
+        {
+            question: "The director's __________ of the film's theme was very powerful.",
+            options: ["interpret", "interpretation", "interpretive", "interpreter"],
+            correct: 1,
+            explanation: "“Interpretation” is the noun for the action of explaining the meaning of something (Thai: การตีความ).",
+            justification: "“Interpret” (verb): to explain the meaning of (Thai: ตีความ) – wrong part of speech.<br>“Interpretive” (adjective): relating to interpretation (Thai: เชิงตีความ) – wrong part of speech.<br>“Interpreter” (noun): a person who interprets (Thai: ล่าม) – wrong meaning."
+        },
+        {
+            question: "The cultural heritage of the city is carefully __________.",
+            options: ["preserve", "preservation", "preservative", "preserved"],
+            correct: 3,
+            explanation: "“Preserved” is the adjective (past participle) meaning maintained in its original or existing state (Thai: ที่ถูกสงวนไว้).",
+            justification: "“Preserve” (verb): to maintain in its original state (Thai: สงวน) – wrong part of speech.<br>“Preservation” (noun): the action of preserving something (Thai: การสงวน) – wrong part of speech.<br>“Preservative” (noun): a substance used to preserve foodstuffs (Thai: สารกันบูด) – wrong meaning."
+        },
+        {
+            question: "Her latest novel has received critical __________.",
+            options: ["acclaim", "acclamation", "acclaimed", "acclamatory"],
+            correct: 0,
+            explanation: "“Acclaim” is the noun for enthusiastic and public praise (Thai: การโห่ร้องชื่นชม).",
+            justification: "“Acclamation” (noun): loud and enthusiastic approval (Thai: การโห่ร้อง) – similar, but acclaim is more common for critical praise.<br>“Acclaimed” (adjective): publicly praised (Thai: ที่ได้รับการยกย่อง) – wrong part of speech.<br>“Acclamatory” (adjective): expressing praise (Thai: ที่แสดงความชื่นชม) – wrong part of speech."
+        },
+        {
+            question: "The symphony was a masterful __________ of different musical ideas.",
+            options: ["compose", "composition", "composer", "composure"],
+            correct: 1,
+            explanation: "“Composition” is the noun for a work of music, literature, or art (Thai: การประพันธ์).",
+            justification: "“Compose” (verb): to write or create a work of art (Thai: ประพันธ์) – wrong part of speech.<br>“Composer” (noun): a person who writes music (Thai: นักประพันธ์เพลง) – wrong meaning.<br>“Composure” (noun): the state of being calm and in control (Thai: ความสงบ) – wrong meaning."
+        },
+        {
+            question: "The __________ of the painting is remarkable, with its fine details.",
+            options: ["execute", "execution", "executive", "executor"],
+            correct: 1,
+            explanation: "“Execution” is the noun for the carrying out or putting into effect of a plan, order, or course of action. In art, it refers to the technical skill in creating the work (Thai: การดำเนินการ/ฝีมือ).",
+            justification: "“Execute” (verb): to carry out a plan (Thai: ดำเนินการ) – wrong part of speech.<br>“Executive” (noun/adjective): a person with senior managerial responsibility (Thai: ผู้บริหาร) – wrong meaning.<br>“Executor” (noun): a person appointed to carry out the terms of a will (Thai: ผู้จัดการมรดก) – wrong meaning."
+        },
+        {
+            question: "The play explores themes of __________ and betrayal.",
+            options: ["redeem", "redemption", "redeeming", "redeemable"],
+            correct: 1,
+            explanation: "“Redemption” is the noun for the action of saving or being saved from sin, error, or evil (Thai: การไถ่บาป).",
+            justification: "“Redeem” (verb): to compensate for the faults of (Thai: ไถ่) – wrong part of speech.<br>“Redeeming” (adjective): compensating for faults (Thai: ที่ไถ่โทษ) – wrong part of speech.<br>“Redeemable” (adjective): able to be redeemed (Thai: ที่สามารถไถ่ถอนได้) – wrong part of speech."
+        },
+        {
+            question: "The museum provides a __________ look at the country's history.",
+            options: ["comprehend", "comprehension", "comprehensive", "comprehensively"],
+            correct: 2,
+            explanation: "“Comprehensive” is the adjective meaning complete; including all or nearly all elements or aspects of something (Thai: ที่ครอบคลุม).",
+            justification: "“Comprehend” (verb): to understand (Thai: เข้าใจ) – wrong part of speech.<br>“Comprehension” (noun): the ability to understand (Thai: ความเข้าใจ) – wrong part of speech.<br>“Comprehensively” (adverb): in a way that is complete (Thai: อย่างครอบคลุม) – wrong part of speech."
+        },
+        {
+            question: "The building is an example of __________ architecture.",
+            options: ["classic", "classical", "classicist", "classicism"],
+            correct: 1,
+            explanation: "“Classical” is the adjective relating to ancient Greek or Latin literature, art, or culture (Thai: แบบคลาสสิก).",
+            justification: "“Classic” (adjective/noun): judged over a period of time to be of the highest quality (Thai: ที่เป็นแบบฉบับ/ผลงานชิ้นเอก) – similar, but 'classical' refers to the specific era.<br>“Classicist” (noun): an expert in classical literature (Thai: นักคลาสสิก) – wrong meaning.<br>“Classicism” (noun): the following of classical principles (Thai: คลาสสิกนิยม) – wrong part of speech."
+        },
+        {
+            question: "The poet's work is known for its emotional __________.",
+            options: ["intense", "intensity", "intensify", "intensely"],
+            correct: 1,
+            explanation: "“Intensity” is the noun for the quality of being intense (Thai: ความเข้มข้น).",
+            justification: "“Intense” (adjective): of extreme force, degree, or strength (Thai: เข้มข้น) – wrong part of speech.<br>“Intensify” (verb): to become or make more intense (Thai: ทำให้เข้มข้นขึ้น) – wrong part of speech.<br>“Intensely” (adverb): with extreme force (Thai: อย่างเข้มข้น) – wrong part of speech."
+        },
+        {
+            question: "The audience was moved by the __________ of the final scene.",
+            options: ["poignant", "poignancy", "poignantly", "point"],
+            correct: 1,
+            explanation: "“Poignancy” is the noun for the quality of evoking a keen sense of sadness or regret (Thai: ความรู้สึกสะเทือนใจ).",
+            justification: "“Poignant” (adjective): evoking a keen sense of sadness (Thai: ที่สะเทือนใจ) – wrong part of speech.<br>“Poignantly” (adverb): in a poignant manner (Thai: อย่างสะเทือนใจ) – wrong part of speech.<br>“Point” (noun): a sharp end (Thai: จุด) – wrong meaning."
+        },
+        {
+            question: "He is a __________ of traditional craftsmanship.",
+            options: ["practice", "practitioner", "practical", "practically"],
+            correct: 1,
+            explanation: "“Practitioner” is the noun for a person actively engaged in an art, discipline, or profession (Thai: ผู้ปฏิบัติ).",
+            justification: "“Practice” (noun): the actual application of a skill (Thai: การปฏิบัติ) – wrong meaning.<br>“Practical” (adjective): concerned with the actual doing of something (Thai: ที่ใช้ได้จริง) – wrong part of speech.<br>“Practically” (adverb): virtually; almost (Thai: ในทางปฏิบัติ) – wrong part of speech."
+        }
+    ],
+    // Set 8: Science and Discovery
+    [
+        {
+            question: "The scientist conducted an __________ to test her hypothesis.",
+            options: ["experiment", "experimental", "experimentally", "experimentation"],
+            correct: 0,
+            explanation: "“Experiment” is the noun for a scientific procedure undertaken to make a discovery, test a hypothesis, or demonstrate a known fact (Thai: การทดลอง).",
+            justification: "“Experimental” (adjective): based on untested ideas (Thai: ที่เป็นการทดลอง) – wrong part of speech.<br>“Experimentally” (adverb): by means of experiment (Thai: โดยการทดลอง) – wrong part of speech.<br>“Experimentation” (noun): the process of performing experiments (Thai: การทดลอง) – wrong part of speech."
+        },
+        {
+            question: "The __________ from the research were published in a scientific journal.",
+            options: ["find", "finding", "founder", "founded"],
+            correct: 1,
+            explanation: "“Finding” (usually plural, 'findings') is the noun for information discovered as the result of an inquiry or investigation (Thai: ผลการวิจัย).",
+            justification: "“Find” (verb/noun): to discover or something discovered (Thai: พบ/สิ่งที่พบ) – wrong part of speech.<br>“Founder” (noun): a person who establishes an institution (Thai: ผู้ก่อตั้ง) – wrong meaning.<br>“Founded” (verb): past tense of found (Thai: ก่อตั้ง) – wrong meaning."
+        },
+        {
+            question: "The telescope allows us to __________ distant galaxies.",
+            options: ["observe", "observation", "observatory", "observant"],
+            correct: 0,
+            explanation: "“Observe” is the verb meaning to notice or perceive (something) and register it as being significant (Thai: สังเกต).",
+            justification: "“Observation” (noun): the action of observing (Thai: การสังเกต) – wrong part of speech.<br>“Observatory” (noun): a building for astronomical research (Thai: หอดูดาว) – wrong meaning.<br>“Observant” (adjective): quick to notice things (Thai: ช่างสังเกต) – wrong part of speech."
+        },
+        {
+            question: "The __________ of gravity is attributed to Isaac Newton.",
+            options: ["discover", "discovery", "discoverer", "discovered"],
+            correct: 1,
+            explanation: "“Discovery” is the noun for the action or process of discovering or being discovered (Thai: การค้นพบ).",
+            justification: "“Discover” (verb): to find unexpectedly (Thai: ค้นพบ) – wrong part of speech.<br>“Discoverer” (noun): a person who discovers something (Thai: ผู้ค้นพบ) – wrong meaning.<br>“Discovered” (past participle): having been found (Thai: ถูกค้นพบ) – wrong form."
+        },
+        {
+            question: "The chemical __________ caused a change in colour.",
+            options: ["react", "reaction", "reactive", "reactor"],
+            correct: 1,
+            explanation: "“Reaction” is the noun for a chemical process in which two or more substances act mutually on each other and are changed into different substances (Thai: ปฏิกิริยา).",
+            justification: "“React” (verb): to act in response to something (Thai: ทำปฏิกิริยา) – wrong part of speech.<br>“Reactive” (adjective): showing a response to a stimulus (Thai: ที่ไวต่อปฏิกิริยา) – wrong part of speech.<br>“Reactor” (noun): an apparatus for containing a nuclear reaction (Thai:เครื่องปฏิกรณ์) – wrong meaning."
+        },
+        {
+            question: "The results of the study were not __________; more research is needed.",
+            options: ["conclude", "conclusion", "conclusive", "conclusively"],
+            correct: 2,
+            explanation: "“Conclusive” is the adjective meaning (of evidence or argument) serving to prove a case; decisive (Thai: ที่เป็นข้อสรุป).",
+            justification: "“Conclude” (verb): to bring to an end (Thai: สรุป) – wrong part of speech.<br>“Conclusion” (noun): the end or finish of an event (Thai: ข้อสรุป) – wrong part of speech.<br>“Conclusively” (adverb): in a way that proves a case (Thai: อย่างเป็นข้อสรุป) – wrong part of speech."
+        },
+        {
+            question: "The samples were examined under a powerful __________.",
+            options: ["micro", "microscope", "microscopic", "microscopy"],
+            correct: 1,
+            explanation: "“Microscope” is the noun for an optical instrument used for viewing very small objects (Thai: กล้องจุลทรรศน์).",
+            justification: "“Micro” (prefix): small (Thai: เล็ก) – not a full word.<br>“Microscopic” (adjective): so small as to be visible only with a microscope (Thai: ที่เล็กมาก) – wrong part of speech.<br>“Microscopy” (noun): the use of a microscope (Thai: การใช้กล้องจุลทรรศน์) – wrong part of speech."
+        },
+        {
+            question: "The theory of __________ was developed by Charles Darwin.",
+            options: ["evolve", "evolution", "evolutionary", "evolutionist"],
+            correct: 1,
+            explanation: "“Evolution” is the noun for the process by which different kinds of living organism are believed to have developed from earlier forms (Thai: วิวัฒนาการ).",
+            justification: "“Evolve” (verb): to develop gradually (Thai: วิวัฒนาการ) – wrong part of speech.<br>“Evolutionary” (adjective): relating to evolution (Thai: เชิงวิวัฒนาการ) – wrong part of speech.<br>“Evolutionist” (noun): a person who believes in evolution (Thai: นักวิวัฒนาการ) – wrong meaning."
+        },
+        {
+            question: "The project requires a __________ approach, combining biology and chemistry.",
+            options: ["multidisciplinary", "discipline", "disciplined", "disciplinary"],
+            correct: 0,
+            explanation: "“Multidisciplinary” is the adjective combining or involving several academic disciplines or professional specializations in an approach to a topic or problem (Thai: สหวิทยาการ).",
+            justification: "“Discipline” (noun): a branch of knowledge (Thai: สาขาวิชา) – wrong meaning.<br>“Disciplined” (adjective): showing a controlled form of behaviour (Thai: ที่มีวินัย) – wrong meaning.<br>“Disciplinary” (adjective): concerning or enforcing discipline (Thai: ทางวินัย) – wrong meaning."
+        },
+        {
+            question: "The data was collected __________ over a period of six months.",
+            options: ["system", "systematic", "systematically", "systematise"],
+            correct: 2,
+            explanation: "“Systematically” is the adverb meaning according to a fixed plan or system; methodically (Thai: อย่างเป็นระบบ).",
+            justification: "“System” (noun): a set of connected things or parts (Thai: ระบบ) – wrong part of speech.<br>“Systematic” (adjective): done according to a fixed plan (Thai: ที่เป็นระบบ) – wrong part of speech.<br>“Systematise” (verb): to arrange according to a system (Thai: จัดระบบ) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the new drug will begin next year.",
+            options: ["clinic", "clinical", "clinically", "clinician"],
+            correct: 1,
+            explanation: "“Clinical” is the adjective relating to the observation and treatment of actual patients rather than theoretical or laboratory studies. It is used here in the phrase 'clinical trials' (Thai: ทางคลินิก).",
+            justification: "“Clinic” (noun): a place where medical treatment is given (Thai: คลินิก) – wrong meaning.<br>“Clinically” (adverb): in a way that relates to a clinic (Thai: ในทางคลินิก) – wrong part of speech.<br>“Clinician” (noun): a doctor having direct contact with patients (Thai: แพทย์) – wrong meaning."
+        },
+        {
+            question: "The research aims to __________ the causes of the disease.",
+            options: ["investigate", "investigation", "investigative", "investigator"],
+            correct: 0,
+            explanation: "“Investigate” is the verb meaning to carry out a systematic or formal inquiry to discover and examine the facts of (an incident, allegation, etc.) so as to establish the truth (Thai: สอบสวน).",
+            justification: "“Investigation” (noun): the action of investigating (Thai: การสอบสวน) – wrong part of speech.<br>“Investigative” (adjective): relating to investigation (Thai: เชิงสอบสวน) – wrong part of speech.<br>“Investigator” (noun): a person who investigates (Thai: ผู้สอบสวน) – wrong meaning."
+        },
+        {
+            question: "The measurements must be as __________ as possible.",
+            options: ["accurate", "accuracy", "accurately", "inaccurate"],
+            correct: 0,
+            explanation: "“Accurate” is the adjective meaning (of information, measurements, etc.) correct in all details; exact (Thai: แม่นยำ).",
+            justification: "“Accuracy” (noun): the quality of being accurate (Thai: ความแม่นยำ) – wrong part of speech.<br>“Accurately” (adverb): in an accurate way (Thai: อย่างแม่นยำ) – wrong part of speech.<br>“Inaccurate” (adjective): not accurate (Thai: ไม่แม่นยำ) – opposite meaning."
+        },
+        {
+            question: "The __________ states that energy cannot be created or destroyed.",
+            options: ["principal", "principle", "principally", "principality"],
+            correct: 1,
+            explanation: "“Principle” is the noun for a fundamental truth or proposition that serves as the foundation for a system of belief or behaviour (Thai: หลักการ).",
+            justification: "“Principal” (adjective/noun): first in order of importance or the head of a school (Thai: หลัก/ครูใหญ่) – wrong meaning.<br>“Principally” (adverb): for the most part (Thai: โดยหลัก) – wrong part of speech.<br>“Principality” (noun): a state ruled by a prince (Thai: ราชรัฐ) – wrong meaning."
+        },
+        {
+            question: "The particles are so small they are __________ to the naked eye.",
+            options: ["visible", "invisible", "vision", "visual"],
+            correct: 1,
+            explanation: "“Invisible” is the adjective meaning unable to be seen (Thai: ที่มองไม่เห็น).",
+            justification: "“Visible” (adjective): able to be seen (Thai: ที่มองเห็นได้) – opposite meaning.<br>“Vision” (noun): the faculty of sight (Thai: การมองเห็น) – wrong part of speech.<br>“Visual” (adjective): relating to seeing (Thai: เกี่ยวกับการมองเห็น) – wrong part of speech."
+        },
+        {
+            question: "The device can __________ radiation levels in the atmosphere.",
+            options: ["detect", "detection", "detective", "detectable"],
+            correct: 0,
+            explanation: "“Detect” is the verb meaning to discover or identify the presence or existence of (Thai: ตรวจจับ).",
+            justification: "“Detection” (noun): the action of detecting (Thai: การตรวจจับ) – wrong part of speech.<br>“Detective” (noun): a person whose occupation is to investigate crimes (Thai: นักสืบ) – wrong meaning.<br>“Detectable” (adjective): able to be detected (Thai: ที่สามารถตรวจจับได้) – wrong part of speech."
+        },
+        {
+            question: "The study showed a strong __________ between smoking and lung cancer.",
+            options: ["correlate", "correlation", "correlative", "correlated"],
+            correct: 1,
+            explanation: "“Correlation” is the noun for a mutual relationship or connection between two or more things (Thai: ความสัมพันธ์).",
+            justification: "“Correlate” (verb): to have a mutual relationship (Thai: มีความสัมพันธ์กัน) – wrong part of speech.<br>“Correlative” (adjective): having a mutual relationship (Thai: ที่สัมพันธ์กัน) – wrong part of speech.<br>“Correlated” (adjective): having a mutual relationship (Thai: ที่มีความสัมพันธ์กัน) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the substance changes when it is heated.",
+            options: ["compose", "composition", "composer", "composure"],
+            correct: 1,
+            explanation: "“Composition” is the noun for the nature of something's constituent parts; the way in which a whole or mixture is made up (Thai: องค์ประกอบ).",
+            justification: "“Compose” (verb): to make up a whole (Thai: ประกอบด้วย) – wrong part of speech.<br>“Composer” (noun): a person who writes music (Thai: นักประพันธ์เพลง) – wrong meaning.<br>“Composure” (noun): the state of being calm (Thai: ความสงบ) – wrong meaning."
+        },
+        {
+            question: "The results need to be __________ by an independent team of researchers.",
+            options: ["verify", "verification", "verifiable", "verified"],
+            correct: 3,
+            explanation: "“Verified” is the past participle used to form the passive voice, meaning confirmed as true or accurate (Thai: ได้รับการยืนยัน).",
+            justification: "“Verify” (verb): to confirm (Thai: ยืนยัน) – wrong form (needs to be passive).<br>“Verification” (noun): the process of confirming (Thai: การยืนยัน) – wrong part of speech.<br>“Verifiable” (adjective): able to be confirmed (Thai: ที่สามารถยืนยันได้) – wrong part of speech."
+        },
+        {
+            question: "The satellite will transmit __________ back to Earth.",
+            options: ["date", "data", "datum", "database"],
+            correct: 1,
+            explanation: "“Data” is the noun for facts and statistics collected together for reference or analysis (Thai: ข้อมูล).",
+            justification: "“Date” (noun): a day of the month or year (Thai: วันที่) – wrong meaning.<br>“Datum” (noun): the singular form of data (rarely used) (Thai: ข้อมูลหนึ่งหน่วย) – wrong number.<br>“Database” (noun): a structured set of data (Thai: ฐานข้อมูล) – wrong meaning."
+        }
+    ],
+    // Set 9: History and Society
+    [
+        {
+            question: "The industrial __________ transformed society in the 18th and 19th centuries.",
+            options: ["revolt", "revolution", "revolutionary", "revolutionise"],
+            correct: 1,
+            explanation: "“Revolution” is the noun for a dramatic and wide-reaching change in the way something works or is organized or in people's ideas about it (Thai: การปฏิวัติ).",
+            justification: "“Revolt” (noun/verb): an act of rebellion (Thai: การกบฏ) – wrong meaning.<br>“Revolutionary” (adjective): involving or causing a complete change (Thai: ที่เป็นการปฏิวัติ) – wrong part of speech.<br>“Revolutionise” (verb): to change something radically (Thai: ปฏิวัติ) – wrong part of speech."
+        },
+        {
+            question: "Ancient __________ left behind remarkable ruins and artefacts.",
+            options: ["civilise", "civilisation", "civil", "civilian"],
+            correct: 1,
+            explanation: "“Civilisation” is the noun for the society, culture, and way of life of a particular area (Thai: อารยธรรม).",
+            justification: "“Civilise” (verb): to bring a place to a stage of social development considered to be advanced (Thai: ทำให้มีอารยธรรม) – wrong part of speech.<br>“Civil” (adjective): relating to ordinary citizens (Thai: ของพลเมือง) – wrong part of speech.<br>“Civilian” (noun): a person not in the armed services (Thai: พลเรือน) – wrong meaning."
+        },
+        {
+            question: "The historian provided a detailed __________ of the events.",
+            options: ["narrate", "narration", "narrative", "narrator"],
+            correct: 2,
+            explanation: "“Narrative” is the noun for a spoken or written account of connected events; a story (Thai: เรื่องเล่า).",
+            justification: "“Narrate” (verb): to give a spoken or written account of (Thai: บรรยาย) – wrong part of speech.<br>“Narration” (noun): the action of narrating (Thai: การบรรยาย) – wrong part of speech.<br>“Narrator” (noun): a person who narrates something (Thai: ผู้บรรยาย) – wrong meaning."
+        },
+        {
+            question: "The fall of the Roman Empire had __________ consequences for Europe.",
+            options: ["profound", "profoundly", "profundity", "professor"],
+            correct: 0,
+            explanation: "“Profound” is the adjective meaning (of a state, quality, or emotion) very great or intense (Thai: ที่ลึกซึ้ง).",
+            justification: "“Profoundly” (adverb): to a profound extent (Thai: อย่างลึกซึ้ง) – wrong part of speech.<br>“Profundity” (noun): deep insight; great depth of knowledge (Thai: ความลึกซึ้ง) – wrong part of speech.<br>“Professor” (noun): a university academic of the highest rank (Thai: ศาสตราจารย์) – wrong meaning."
+        },
+        {
+            question: "Social structures often __________ over long periods of time.",
+            options: ["evolve", "evolution", "evolutionary", "evolutionist"],
+            correct: 0,
+            explanation: "“Evolve” is the verb meaning to develop gradually (Thai: วิวัฒนาการ).",
+            justification: "“Evolution” (noun): the gradual development of something (Thai: วิวัฒนาการ) – wrong part of speech.<br>“Evolutionary” (adjective): relating to evolution (Thai: เชิงวิวัฒนาการ) – wrong part of speech.<br>“Evolutionist” (noun): a person who believes in evolution (Thai: นักวิวัฒนาการ) – wrong meaning."
+        },
+        {
+            question: "The __________ of democracy can be traced back to ancient Greece.",
+            options: ["origin", "original", "originate", "originally"],
+            correct: 0,
+            explanation: "“Origin” is the noun for the point or place where something begins, arises, or is derived (Thai: จุดกำเนิด).",
+            justification: "“Original” (adjective): present or existing from the beginning (Thai: ดั้งเดิม) – wrong part of speech.<br>“Originate” (verb): to have a specified beginning (Thai: กำเนิด) – wrong part of speech.<br>“Originally” (adverb): from the beginning (Thai: แต่เดิม) – wrong part of speech."
+        },
+        {
+            question: "The treaty marked the __________ of the war.",
+            options: ["conclude", "conclusion", "conclusive", "conclusively"],
+            correct: 1,
+            explanation: "“Conclusion” is the noun for the end or finish of an event or process (Thai: การสิ้นสุด).",
+            justification: "“Conclude” (verb): to bring to an end (Thai: สิ้นสุด) – wrong part of speech.<br>“Conclusive” (adjective): decisive (Thai: ที่เป็นข้อสรุป) – wrong meaning.<br>“Conclusively” (adverb): decisively (Thai: อย่างเป็นข้อสรุป) – wrong part of speech."
+        },
+        {
+            question: "The king's reign was a period of great __________.",
+            options: ["prosper", "prosperity", "prosperous", "prosperously"],
+            correct: 1,
+            explanation: "“Prosperity” is the noun for the state of being prosperous (Thai: ความเจริญรุ่งเรือง).",
+            justification: "“Prosper” (verb): to succeed in material terms (Thai: เจริญรุ่งเรือง) – wrong part of speech.<br>“Prosperous” (adjective): successful in material terms (Thai: ที่เจริญรุ่งเรือง) – wrong part of speech.<br>“Prosperously” (adverb): in a successful way (Thai: อย่างเจริญรุ่งเรือง) – wrong part of speech."
+        },
+        {
+            question: "The movement advocated for greater social __________.",
+            options: ["equal", "equality", "equalise", "equally"],
+            correct: 1,
+            explanation: "“Equality” is the noun for the state of being equal, especially in status, rights, and opportunities (Thai: ความเท่าเทียม).",
+            justification: "“Equal” (adjective): being the same in quantity, size, degree, or value (Thai: เท่าเทียม) – wrong part of speech.<br>“Equalise” (verb): to make equal (Thai: ทำให้เท่าเทียมกัน) – wrong part of speech.<br>“Equally” (adverb): in the same manner (Thai: อย่างเท่าเทียมกัน) – wrong part of speech."
+        },
+        {
+            question: "The pyramids are a __________ to the ingenuity of the ancient Egyptians.",
+            options: ["testify", "testimony", "testament", "testimonial"],
+            correct: 2,
+            explanation: "“Testament” is the noun for something that serves as a sign or evidence of a specified fact, event, or quality (Thai: เครื่องพิสูจน์).",
+            justification: "“Testify” (verb): to give evidence as a witness (Thai: ให้การ) – wrong part of speech.<br>“Testimony” (noun): a formal written or spoken statement (Thai: คำให้การ) – wrong meaning.<br>“Testimonial” (noun): a formal statement testifying to someone's character and qualifications (Thai: คำรับรอง) – wrong meaning."
+        },
+        {
+            question: "The __________ of the printing press revolutionised communication.",
+            options: ["invent", "invention", "inventive", "inventor"],
+            correct: 1,
+            explanation: "“Invention” is the noun for the action of inventing something (Thai: การประดิษฐ์).",
+            justification: "“Invent” (verb): to create or design something new (Thai: ประดิษฐ์) – wrong part of speech.<br>“Inventive” (adjective): having the ability to create new things (Thai: ที่มีความคิดสร้างสรรค์) – wrong part of speech.<br>“Inventor” (noun): a person who invented something (Thai: นักประดิษฐ์) – wrong meaning."
+        },
+        {
+            question: "The government underwent a major __________ after the election.",
+            options: ["reform", "reformation", "reformer", "reformed"],
+            correct: 0,
+            explanation: "“Reform” is the noun meaning the improvement or amendment of what is wrong, corrupt, or unsatisfactory (Thai: การปฏิรูป).",
+            justification: "“Reformation” (noun): the action of reforming (often refers to the 16th-century religious movement) (Thai: การปฏิรูป) – less common for general government change.<br>“Reformer” (noun): a person who advocates for reform (Thai: นักปฏิรูป) – wrong meaning.<br>“Reformed” (adjective): having been improved (Thai: ที่ปฏิรูปแล้ว) – wrong part of speech."
+        },
+        {
+            question: "The castle has been __________ restored to its former glory.",
+            options: ["beautiful", "beauty", "beautifully", "beautify"],
+            correct: 2,
+            explanation: "“Beautifully” is the adverb meaning in a way that pleases the senses or mind aesthetically (Thai: อย่างสวยงาม).",
+            justification: "“Beautiful” (adjective): pleasing the senses (Thai: สวยงาม) – wrong part of speech.<br>“Beauty” (noun): a quality that pleases the senses (Thai: ความงาม) – wrong part of speech.<br>“Beautify” (verb): to make beautiful (Thai: ทำให้สวยงาม) – wrong part of speech."
+        },
+        {
+            question: "The historical documents provide a __________ account of the period.",
+            options: ["fascinate", "fascination", "fascinating", "fascinated"],
+            correct: 2,
+            explanation: "“Fascinating” is the adjective meaning extremely interesting (Thai: ที่น่าหลงใหล).",
+            justification: "“Fascinate” (verb): to attract the strong attention of (Thai: ทำให้หลงใหล) – wrong part of speech.<br>“Fascination” (noun): the quality of being fascinating (Thai: ความหลงใหล) – wrong part of speech.<br>“Fascinated” (adjective): strongly attracted and interested (Thai: ที่หลงใหล) – describes a person's feeling, not the account itself."
+        },
+        {
+            question: "The rise of cities was a key __________ in human history.",
+            options: ["develop", "development", "developer", "developing"],
+            correct: 1,
+            explanation: "“Development” is the noun for an event constituting a new stage in a changing situation (Thai: การพัฒนา).",
+            justification: "“Develop” (verb): to grow or advance (Thai: พัฒนา) – wrong part of speech.<br>“Developer” (noun): one who develops (Thai: นักพัฒนา) – wrong meaning.<br>“Developing” (adjective): in the process of growing (Thai: ที่กำลังพัฒนา) – wrong part of speech."
+        },
+        {
+            question: "The country has a rich cultural __________.",
+            options: ["inherit", "inheritance", "heritage", "hereditary"],
+            correct: 2,
+            explanation: "“Heritage” is the noun for property that is or may be inherited; an inheritance. It also means valued objects and qualities such as cultural traditions (Thai: มรดก).",
+            justification: "“Inherit” (verb): to receive as an heir (Thai: รับมรดก) – wrong part of speech.<br>“Inheritance” (noun): a thing that is inherited (Thai: มรดก) – similar, but 'heritage' is broader for culture.<br>“Hereditary” (adjective): conferred by or based on inheritance (Thai: ทางพันธุกรรม) – wrong meaning."
+        },
+        {
+            question: "The political climate was one of great __________.",
+            options: ["stable", "stability", "stabilise", "instability"],
+            correct: 3,
+            explanation: "“Instability” is the noun for the state of being unstable; lack of stability (Thai: ความไม่มั่นคง). The context implies change and turmoil.",
+            justification: "“Stable” (adjective): not likely to change (Thai: มั่นคง) – opposite meaning.<br>“Stability” (noun): the state of being stable (Thai: ความมั่นคง) – opposite meaning.<br>“Stabilise” (verb): to make stable (Thai: ทำให้มั่นคง) – wrong part of speech."
+        },
+        {
+            question: "The monarch held __________ power over the kingdom.",
+            options: ["absolute", "absolutely", "absolution", "absolutism"],
+            correct: 0,
+            explanation: "“Absolute” is the adjective meaning not qualified or diminished in any way; total (Thai: ที่สมบูรณ์).",
+            justification: "“Absolutely” (adverb): with no qualification (Thai: อย่างแน่นอน) – wrong part of speech.<br>“Absolution” (noun): formal release from guilt (Thai: การอภัยโทษ) – wrong meaning.<br>“Absolutism” (noun): the political belief in absolute principles (Thai: ระบอบสมบูรณาญาสิทธิราชย์) – wrong part of speech."
+        },
+        {
+            question: "The __________ of the new law was met with public protest.",
+            options: ["introduce", "introduction", "introductory", "introducing"],
+            correct: 1,
+            explanation: "“Introduction” is the noun for the action of bringing something into use or operation for the first time (Thai: การนำมาใช้).",
+            justification: "“Introduce” (verb): to bring into use (Thai: นำมาใช้) – wrong part of speech.<br>“Introductory” (adjective): serving as an introduction (Thai: เบื้องต้น) – wrong part of speech.<br>“Introducing” (gerund): the action of bringing into use (Thai: การนำมาใช้) – wrong part of speech."
+        },
+        {
+            question: "The historian's work is known for its meticulous __________ to detail.",
+            options: ["attend", "attention", "attentive", "attentively"],
+            correct: 1,
+            explanation: "“Attention” is the noun for notice taken of someone or something; the regarding of someone or something as interesting or important (Thai: ความใส่ใจ).",
+            justification: "“Attend” (verb): to be present at (Thai: เข้าร่วม) – wrong part of speech.<br>“Attentive” (adjective): paying close attention (Thai: ที่ใส่ใจ) – wrong part of speech.<br>“Attentively” (adverb): while paying close attention (Thai: อย่างใส่ใจ) – wrong part of speech."
+        }
+    ]
+];
+
+
+        let currentQuizSetIndex = 0;
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let userAnswers = [];
+        let chartInstance = null;
+
+        const homePageContainer = document.getElementById('home-page-container');
+        const quizSetButtonsContainer = document.getElementById('quiz-set-buttons');
+        const quizContainer = document.getElementById('quiz-container');
+        const resultsContainer = document.getElementById('results-container');
+
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainerEl = document.getElementById('options-container');
+        const feedbackContainerEl = document.getElementById('feedback-container');
+        const feedbackTitleEl = document.getElementById('feedback-title');
+        const feedbackExplanationEl = document.getElementById('feedback-explanation');
+        const feedbackJustificationEl = document.getElementById('feedback-justification');
+        const nextButton = document.getElementById('next-button');
+        const backToHomeButton = document.getElementById('back-to-home-button');
+        const progressTextEl = document.getElementById('progress-text');
+        const progressBarEl = document.getElementById('progress-bar');
+        const scoreTextEl = document.getElementById('score-text');
+        const restartButton = document.getElementById('restart-button');
+
+        function showHomePage() {
+            homePageContainer.classList.remove('hidden');
+            quizContainer.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            renderQuizSetButtons();
+        }
+
+        function renderQuizSetButtons() {
+            quizSetButtonsContainer.innerHTML = '';
+            quizSets.forEach((set, index) => {
+                const button = document.createElement('button');
+                button.textContent = `Quiz Set ${index + 1}`;
+                button.classList.add('w-full', 'p-6', 'bg-teal-500', 'text-white', 'font-semibold', 'rounded-lg', 'shadow-md', 'hover:bg-teal-600', 'focus:outline-none', 'focus:ring-2', 'focus:ring-teal-500', 'focus:ring-opacity-75', 'transition-colors', 'text-lg');
+                button.addEventListener('click', () => startQuiz(index));
+                quizSetButtonsContainer.appendChild(button);
+            });
+        }
+
+        function startQuiz(setIndex) {
+            currentQuizSetIndex = setIndex;
+            currentQuestionIndex = 0;
+            score = 0;
+            userAnswers = new Array(quizSets[currentQuizSetIndex].length).fill(null);
+            
+            homePageContainer.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            quizContainer.classList.remove('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            resetState();
+            const currentQuestion = quizSets[currentQuizSetIndex][currentQuestionIndex];
+            questionTextEl.textContent = currentQuestion.question.replace('________', '________');
+            
+            currentQuestion.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('w-full', 'p-4', 'border-2', 'border-stone-300', 'rounded-lg', 'text-left', 'hover:bg-stone-100', 'hover:border-teal-400', 'transition-colors', 'duration-200', 'focus:outline-none', 'focus:ring-2', 'focus:ring-teal-500');
+                button.dataset.index = index;
+                button.addEventListener('click', () => selectAnswer(index));
+                optionsContainerEl.appendChild(button);
+            });
+
+            updateProgress();
+        }
+
+        function resetState() {
+            optionsContainerEl.innerHTML = '';
+            feedbackContainerEl.classList.add('hidden');
+            nextButton.disabled = true;
+        }
+
+        function selectAnswer(selectedIndex) {
+            const currentQuestion = quizSets[currentQuizSetIndex][currentQuestionIndex];
+            const isCorrect = selectedIndex === currentQuestion.correct;
+            userAnswers[currentQuestionIndex] = selectedIndex;
+
+            if (isCorrect) {
+                score++;
+                feedbackTitleEl.textContent = 'Correct!';
+                feedbackTitleEl.classList.remove('text-red-600');
+                feedbackTitleEl.classList.add('text-green-600');
+            } else {
+                feedbackTitleEl.textContent = 'Incorrect';
+                feedbackTitleEl.classList.remove('text-green-600');
+                feedbackTitleEl.classList.add('text-red-600');
+            }
+
+            feedbackExplanationEl.textContent = currentQuestion.explanation;
+            feedbackJustificationEl.textContent = `Justification: ${currentQuestion.justification}`;
+            feedbackContainerEl.classList.remove('hidden');
+
+            Array.from(optionsContainerEl.children).forEach(button => {
+                button.disabled = true;
+                const buttonIndex = parseInt(button.dataset.index);
+
+                if (buttonIndex === currentQuestion.correct) {
+                    button.classList.remove('border-stone-300', 'hover:bg-stone-100');
+                    button.classList.add('bg-green-100', 'border-green-500', 'font-semibold');
+                } else if (buttonIndex === selectedIndex) {
+                    button.classList.remove('border-stone-300', 'hover:bg-stone-100');
+                    button.classList.add('bg-red-100', 'border-red-500');
+                }
+            });
+
+            nextButton.disabled = false;
+        }
+
+        function updateProgress() {
+            const totalQuestionsInSet = quizSets[currentQuizSetIndex].length;
+            const progressPercentage = ((currentQuestionIndex + 1) / totalQuestionsInSet) * 100;
+            progressTextEl.textContent = `Question ${currentQuestionIndex + 1} / ${totalQuestionsInSet}`;
+            progressBarEl.style.width = `${progressPercentage}%`;
+        }
+
+        function showResults() {
+            quizContainer.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+            scoreTextEl.textContent = `You scored ${score} out of ${quizSets[currentQuizSetIndex].length}.`;
+            renderResultsChart();
+        }
+        
+        function renderResultsChart() {
+            const ctx = document.getElementById('results-chart').getContext('2d');
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Correct', 'Incorrect'],
+                    datasets: [{
+                        data: [score, quizSets[currentQuizSetIndex].length - score],
+                        backgroundColor: ['#14b8a6', '#fca5a5'],
+                        borderColor: ['#0f766e', '#ef4444'],
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    }
+                }
+            });
+        }
+
+        nextButton.addEventListener('click', () => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizSets[currentQuizSetIndex].length) {
+                showQuestion();
+            } else {
+                showResults();
+            }
+        });
+
+        backToHomeButton.addEventListener('click', showHomePage);
+        restartButton.addEventListener('click', showHomePage);
+
+        document.addEventListener('DOMContentLoaded', showHomePage);
+    </script>
+</body>
+</html>
